@@ -423,7 +423,12 @@ function AthleteQRBroadcastPage({ eventId, onToast }) {
               setClubs(prev => {
                 const names = prev.map(c => typeof c === 'string' ? c : c.full);
                 if (!names.includes(raw)) {
-                  return [...prev, { short: raw, full: raw, fileRegistered: 0 }].sort((a,b) => a.full.localeCompare(b.full));
+                  const newList = [...prev, { short: raw, full: raw, fileRegistered: 0 }];
+                  return newList.sort((a, b) => {
+                    const nameA = typeof a === 'string' ? a : a.full;
+                    const nameB = typeof b === 'string' ? b : b.full;
+                    return nameA.localeCompare(nameB);
+                  });
                 }
                 return prev;
               });
@@ -612,17 +617,26 @@ function AthleteQRBroadcastPage({ eventId, onToast }) {
             <div>
               <label className="block text-gray-400 text-xs font-bold uppercase tracking-widest mb-2">Filter Clubs</label>
               <div className="bg-gray-900 border border-gray-700 rounded-xl p-2 max-h-40 overflow-y-auto space-y-1">
-                {clubs.map(club => (
-                  <label key={club} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 rounded cursor-pointer transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={selectedClubs.includes(club)}
-                      onChange={() => setSelectedClubs(prev => prev.includes(club) ? prev.filter(c => c !== club) : [...prev, club])}
-                      className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-0"
-                    />
-                    <span className="text-sm text-gray-300 truncate">{club}</span>
-                  </label>
-                ))}
+                {clubs.map((club, idx) => {
+                  const clubName = typeof club === 'string' ? club : club.full;
+                  const clubKey = typeof club === 'string' ? club : (club.id || clubName || idx);
+                  return (
+                    <label key={clubKey} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 rounded cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={selectedClubs.includes(clubName) || selectedClubs.includes(club)}
+                        onChange={() => {
+                          const targetValue = typeof club === 'string' ? club : club.full;
+                          setSelectedClubs(prev => 
+                            prev.includes(targetValue) ? prev.filter(c => c !== targetValue && c.full !== targetValue) : [...prev, targetValue]
+                          );
+                        }}
+                        className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-0"
+                      />
+                      <span className="text-sm text-gray-300 truncate">{clubName}</span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
             <div>
