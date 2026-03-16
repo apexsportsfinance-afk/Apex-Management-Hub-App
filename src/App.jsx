@@ -11,6 +11,7 @@ const Home = lazy(() => import("./pages/public/Home"));
 const Login = lazy(() => import("./pages/public/Login"));
 const Register = lazy(() => import("./pages/public/Register"));
 const VerifyAccreditation = lazy(() => import("./pages/public/VerifyAccreditation"));
+const ScannerPage = lazy(() => import("./pages/public/Scanner"));
 
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
 const Events = lazy(() => import("./pages/admin/Events"));
@@ -45,6 +46,7 @@ export default function App() {
               <Route path="/register/:slug" element={<Register />} />
               <Route path="/verify/:id" element={<VerifyAccreditation />} />
               <Route path="/accreditation/:id" element={<VerifyAccreditation />} />
+              <Route path="/scanner" element={<ScannerPage />} />
 
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<Navigate to="/admin/dashboard" replace />} />

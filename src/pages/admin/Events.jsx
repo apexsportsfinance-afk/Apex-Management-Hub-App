@@ -41,6 +41,7 @@ import { useToast } from "../../components/ui/Toast";
 import { EventsAPI, AccreditationsAPI, EventCategoriesAPI, CategoriesAPI } from "../../lib/storage";
 import { GlobalSettingsAPI } from "../../lib/broadcastApi";
 import { formatDate, fileToBase64 } from "../../lib/utils";
+import AttendanceSheet from "../../components/attendance/AttendanceSheet";
 const DOCUMENT_OPTIONS = [
   { id: "picture", label: "Picture" },
   { id: "passport", label: "Passport" },
@@ -67,6 +68,7 @@ export default function Events() {
   const [eventCounts, setEventCounts] = useState({});
   const [editingEvent, setEditingEvent] = useState(null);
   const [copiedSlug, setCopiedSlug] = useState(null);
+  const [copiedScannerEventId, setCopiedScannerEventId] = useState(null);
   const [shareModal, setShareModal] = useState({ open: false, slug: "" });
   const [deleteModal, setDeleteModal] = useState({ open: false, event: null });
   const [deleting, setDeleting] = useState(false);
@@ -275,6 +277,10 @@ export default function Events() {
     return `${window.location.origin}/register/${slug}`;
   };
 
+  const getScannerLink = (eventId) => {
+    return `${window.location.origin}/scanner?event_id=${eventId}&mode=attendance`;
+  };
+
   const copyRegistrationLink = async (slug) => {
     const link = getRegistrationLink(slug);
     try {
@@ -288,6 +294,22 @@ export default function Events() {
       }
     } catch {
       toast.info("Please copy the link manually");
+    }
+  };
+
+  const copyScannerLink = async (eventId) => {
+    const link = getScannerLink(eventId);
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(link);
+        setCopiedScannerEventId(eventId);
+        toast.success("Scanner link copied to clipboard");
+        setTimeout(() => setCopiedScannerEventId(null), 2000);
+      } else {
+        toast.info("Please copy the link manually");
+      }
+    } catch {
+      toast.error("Failed to copy link");
     }
   };
 
@@ -624,6 +646,26 @@ export default function Events() {
             </div>
           );
         })()
+      ) : subpage === "attendance" ? (
+        /* --- ATTENDANCE SUB-PAGE --- */
+        (() => {
+          const event = events.find(e => e.id === id);
+          if (!event) return null;
+          return (
+            <div className="space-y-6">
+              <div className="flex items-center gap-4 mb-4">
+                <button 
+                  onClick={() => navigate(`/admin/events/${id}`)}
+                  className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <h2 className="text-2xl font-bold text-white">Event Attendance</h2>
+              </div>
+              <AttendanceSheet event={event} onClose={() => navigate(`/admin/events/${id}`)} />
+            </div>
+          );
+        })()
       ) : (
         /* --- DETAIL VIEW (DEFAULT) --- */
         (() => {
@@ -780,6 +822,24 @@ export default function Events() {
                           </a>
                         </div>
                       </div>
+
+                      <div className="pt-2">
+                        <label className="text-xs font-bold uppercase tracking-widest text-slate-500 block mb-2">QR Scanner Link</label>
+                        <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 group">
+                          <Activity className="w-5 h-5 text-cyan-400" />
+                          <code className="text-cyan-300 flex-1 truncate">{getScannerLink(event.id)}</code>
+                          <button
+                            onClick={() => copyScannerLink(event.id)}
+                            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                            title="Copy link"
+                          >
+                            {copiedScannerEventId === event.id ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5" />}
+                          </button>
+                          <a href={getScannerLink(event.id)} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
+                            <ExternalLink className="w-5 h-5" />
+                          </a>
+                        </div>
+                      </div>
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2 text-slate-400 bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-800">
                           <FileText className="w-4 h-4 text-primary-400" />
@@ -836,6 +896,13 @@ export default function Events() {
                   icon={Upload}
                   color="from-purple-600 to-indigo-500"
                   onClick={() => navigate(`/admin/events/${id}/clubs`)}
+                />
+                <DetailActionCard 
+                  title="Attendance Module" 
+                  description="View live event scanner check-ins and download attendance reports"
+                  icon={Activity}
+                  color="from-cyan-600 to-sky-500"
+                  onClick={() => navigate(`/admin/events/${id}/attendance`)}
                 />
               </div>
             </motion.div>

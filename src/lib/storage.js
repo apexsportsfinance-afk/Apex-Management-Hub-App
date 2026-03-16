@@ -397,6 +397,25 @@ export const AccreditationsAPI = {
     return data ? mapAccreditationFromDB(data) : null;
   },
 
+  validateToken: async (token) => {
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
+    let query = supabase.from("accreditations").select("*");
+    
+    if (isUUID) {
+      // First try by ID (if it's a UUID)
+      const { data: byId } = await query.eq("id", token).maybeSingle();
+      if (byId) return mapAccreditationFromDB(byId);
+      
+      // If it's a UUID but not the primary ID, try accreditation_id
+      const { data: byAccId } = await supabase.from("accreditations").select("*").eq("accreditation_id", token).maybeSingle();
+      return byAccId ? mapAccreditationFromDB(byAccId) : null;
+    } else {
+      // If it's short ID, search by accreditation_id
+      const data = await handleResponse(query.eq("accreditation_id", token).maybeSingle()).catch(() => null);
+      return data ? mapAccreditationFromDB(data) : null;
+    }
+  },
+
   checkDuplicate: async (eventId, firstName, lastName, club, dateOfBirth) => {
     const { data, error } = await supabase
       .from("accreditations")
