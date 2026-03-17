@@ -1914,7 +1914,7 @@ function ClubsAnalyticsView({ event }) {
         <CardContent className="p-0 overflow-hidden">
           <div className="p-8 border-b border-slate-800/50 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <h3 className="text-3xl font-black text-white mb-2 tracking-tighter uppercase italic">Club Analytics</h3>
+              <h3 className="text-2xl font-bold text-white mb-2 tracking-tight">Club Analytics</h3>
               <p className="text-slate-400 font-light max-w-md">Real-time tracking of athlete registrations and approved accreditations per club.</p>
             </div>
             <div className="flex flex-wrap items-center gap-4">
@@ -1954,30 +1954,6 @@ function ClubsAnalyticsView({ event }) {
               )}
               <input id="club-import" type="file" className="hidden" accept=".csv,.xlsx,.pdf" onChange={handleFileUpload} />
             </div>
-
-            {/* Delete Confirmation Modal */}
-            <Modal open={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Clear Clubs List">
-              <div className="p-6">
-                <p className="text-slate-300 mb-6 font-light italic">
-                  Are you sure you want to delete the active club list and clear all analytics data? This action cannot be undone.
-                </p>
-                <div className="flex justify-end gap-3">
-                  <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
-                  <Button variant="secondary" className="text-red-400 border-red-500/20 hover:bg-red-500/10" onClick={confirmClearClubs}>
-                    Yes, Clear List
-                  </Button>
-                </div>
-              </div>
-            </Modal>
-
-            {/* Premium Export Modal */}
-            <ExportModal 
-              open={exportModalOpen}
-              onClose={() => setExportModalOpen(false)}
-              clubs={analytics} // Pass the parsed analytics so it has {full, short}
-              initialSelectedClubs={Array.from(selectedRows)}
-              onExport={executeExport}
-            />
           </div>
 
           <div className="px-6 pt-6">

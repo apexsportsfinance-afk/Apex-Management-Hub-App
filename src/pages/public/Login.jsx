@@ -84,33 +84,27 @@ export default function Login() {
             )}
 
             <div className="space-y-4 relative z-10">
-              <div className="relative">
-                <Mail className="absolute left-3 top-[38px] w-5 h-5 text-cyan-400" />
-                <Input
-                  label="Email Address"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@accreditpro.com"
-                  className="pl-10"
-                  required
-                  light
-                />
-              </div>
+              <Input
+                label="Email Address"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@accreditpro.com"
+                icon={Mail}
+                required
+                light
+              />
 
-              <div className="relative">
-                <Lock className="absolute left-3 top-[38px] w-5 h-5 text-cyan-400" />
-                <Input
-                  label="Password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="pl-10"
-                  required
-                  light
-                />
-              </div>
+              <Input
+                label="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                icon={Lock}
+                required
+                light
+              />
             </div>
 
             <Button

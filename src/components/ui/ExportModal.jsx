@@ -22,10 +22,18 @@ export default function ExportModal({ open, onClose, clubs, initialSelectedClubs
 
   React.useEffect(() => {
     if (open) {
-      setSelectedClubs(initialSelectedClubs);
+      if (initialSelectedClubs.length > 0) {
+        setSelectedClubs(initialSelectedClubs);
+      } else if (clubs && clubs.length > 0) {
+        // Fallback: If no rows were checked in the main table, pre-select all clubs
+        // so the user can just click "Generate Export" instantly.
+        setSelectedClubs(clubs.map(c => c.full));
+      } else {
+        setSelectedClubs([]);
+      }
       setSearchTerm('');
     }
-  }, [open, initialSelectedClubs]);
+  }, [open, initialSelectedClubs, clubs]);
 
   const filteredClubs = useMemo(() => {
     if (!searchTerm) return clubs;
@@ -85,7 +93,7 @@ export default function ExportModal({ open, onClose, clubs, initialSelectedClubs
   };
 
   return (
-    <Modal open={open} onClose={() => !isExporting && onClose()} title="Export Club Data">
+    <Modal isOpen={open} onClose={() => !isExporting && onClose()} title="Export Club Data">
       <div className="p-6 space-y-8">
         
         {/* Step 1: Format Selection */}
