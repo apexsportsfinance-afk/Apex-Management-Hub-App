@@ -1,4 +1,5 @@
 import jaroWinkler from 'jaro-winkler';
+import * as XLSX from 'xlsx';
 
 let pdfjsLib = null;
 
@@ -10,11 +11,294 @@ async function getPdfJs() {
 }
 
 /**
- * Parses a HYTEK Meet Manager Heat Sheet or Event Results PDF.
- * Implements Smart 2-Column Detection and Automatic "LastName, FirstName" flipping.
- * Returns an array of matrix objects.
+ * Universal Parser for HYTEK Meet Manager Heat Sheets or Event Results.
+ * Supports: PDF, HTML, XLSX, XLS, and CSV
  */
-export async function parseCompetitionPdf(file, type = 'heat_sheet') {
+export async function parseCompetitionFile(file, type = 'heat_sheet') {
+  const filename = file.name ? file.name.toLowerCase() : '';
+  
+  if (filename.endsWith('.pdf')) {
+    return parseCompetitionPdf(file, type);
+  } else if (filename.endsWith('.htm') || filename.endsWith('.html')) {
+    return parseCompetitionHtml(file, type);
+  } else if (filename.endsWith('.xlsx') || filename.endsWith('.xls') || filename.endsWith('.csv')) {
+    return parseCompetitionExcel(file, type);
+  } else {
+    console.warn("Unknown file extension, attempting PDF parser by default:", filename);
+    try {
+        return await parseCompetitionPdf(file, type);
+    } catch (err) {
+        throw new Error("Unsupported file format. Please upload a PDF, HTML, Excel, or CSV file.");
+    }
+  }
+}
+
+async function parseCompetitionExcel(file, type = 'heat_sheet') {
+  const arrayBuffer = await file.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+  const firstSheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[firstSheetName];
+  // Parse into an array of arrays
+  const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+  const results = [];
+  let currentEventCode = null;
+  let currentEventName = null;
+  let currentHeat = null;
+  let columnIndexes = { lane: -1, name: -1, age: -1, team: -1, seedTime: -1, finalTime: -1, place: -1 };
+
+  const eventRegex = /(?:Event\s+)(\d+[A-Z]?\.?\d*)\s+([A-Z].+)/i;
+  const heatRegex = /(?:Heat|#|Flight|Group)\s*(\d+)/i;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !row.length) continue;
+    const rowText = row.join(" ").replace(/\s+/g, ' ').trim();
+
+    let eventMatch = rowText.match(eventRegex);
+    if (!eventMatch) {
+        for (const cell of row) {
+            if (typeof cell !== 'string') continue;
+            const m = cell.replace(/\s+/g, ' ').trim().match(eventRegex);
+            if (m) { eventMatch = m; break; }
+        }
+    }
+
+    if (eventMatch) {
+      currentEventCode = eventMatch[1];
+      currentEventName = eventMatch[2].trim();
+      currentHeat = null;
+      columnIndexes = { lane: -1, name: -1, age: -1, team: -1, seedTime: -1, finalTime: -1, place: -1 };
+      continue;
+    }
+
+    if (!currentEventCode) continue;
+
+    const heatMatch = rowText.match(heatRegex);
+    if (heatMatch && row.some(c => typeof c === 'string' && c.toLowerCase().includes('heat'))) {
+       currentHeat = parseInt(heatMatch[1], 10);
+    }
+
+    const lowerText = rowText.toLowerCase();
+    if (lowerText.includes('lane') || lowerText.includes('name') || lowerText.includes('team')) {
+      let foundHeaders = false;
+      row.forEach((cell, index) => {
+        if (typeof cell !== 'string') return;
+        const txt = cell.trim().toLowerCase();
+        if (txt === 'lane') { columnIndexes.lane = index; foundHeaders = true; }
+        else if (txt === 'name') { columnIndexes.name = index; foundHeaders = true; }
+        else if (txt === 'age') { columnIndexes.age = index; foundHeaders = true; }
+        else if (txt === 'team' || txt === 'club') { columnIndexes.team = index; foundHeaders = true; }
+        else if (txt.includes('seed')) { columnIndexes.seedTime = index; foundHeaders = true; }
+        else if (txt.includes('final') || txt === 'result time') { columnIndexes.finalTime = index; foundHeaders = true; }
+        else if (txt === 'place' || txt === 'rank') { columnIndexes.place = index; foundHeaders = true; }
+      });
+      if (foundHeaders) continue;
+    }
+
+    if (currentEventCode && columnIndexes.name !== -1) {
+        const laneValRaw = row[columnIndexes.lane] || row[0];
+        let laneVal = null;
+        let isAthleteRow = false;
+
+        if (laneValRaw !== undefined && laneValRaw !== null && /^\d+$/.test(String(laneValRaw).trim())) {
+            laneVal = parseInt(String(laneValRaw).trim(), 10);
+            isAthleteRow = true;
+        }
+
+        if (isAthleteRow) {
+            const extractCell = (idx) => {
+                const val = row[idx];
+                return val !== undefined && val !== null ? String(val).replace(/\s+/g, ' ').trim() : "";
+            };
+
+            const rawName = extractCell(columnIndexes.name);
+            const rawAge = extractCell(columnIndexes.age);
+            const rawTeam = extractCell(columnIndexes.team);
+            const rawSeed = extractCell(columnIndexes.seedTime);
+            const rawFinal = extractCell(columnIndexes.finalTime);
+            const rawPlace = extractCell(columnIndexes.place);
+
+            if (rawName && rawName.length > 2) {
+                let formattedName = rawName;
+                if (formattedName.includes(',')) {
+                    const parts = formattedName.split(',');
+                    if (parts.length === 2) {
+                        formattedName = `${parts[1].trim()} ${parts[0].trim()}`;
+                    }
+                }
+                results.push({
+                    eventCode: currentEventCode,
+                    eventName: currentEventName,
+                    heat: currentHeat || 1,
+                    lane: laneVal,
+                    athleteName: formattedName,
+                    age: rawAge ? parseInt(rawAge, 10) : null,
+                    club: rawTeam,
+                    seedTime: rawSeed || null,
+                    resultTime: rawFinal || null,
+                    rank: rawPlace ? parseInt(rawPlace, 10) : null
+                });
+            }
+        }
+    }
+  }
+  return results;
+}
+
+async function parseCompetitionHtml(file, type = 'heat_sheet') {
+  const htmlContent = await file.text();
+  
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlContent, 'text/html');
+  
+  const allRows = [];
+  
+  // Extract vertically maintaining structure
+  const topLevels = doc.body.children;
+  for (let i = 0; i < topLevels.length; i++) {
+    const el = topLevels[i];
+    if (el.tagName === 'P' || el.tagName === 'DIV') {
+      const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (text) allRows.push([text]);
+    } else if (el.tagName === 'TABLE') {
+      const trs = el.querySelectorAll('tr');
+      for (let j = 0; j < trs.length; j++) {
+        const tr = trs[j];
+        const tds = tr.querySelectorAll('td, th');
+        if (!tds.length) continue;
+        
+        let maxP = 1;
+        tds.forEach(td => {
+            const pCount = td.querySelectorAll('p').length;
+            if (pCount > maxP) maxP = pCount;
+        });
+
+        if (maxP <= 1) {
+            const cells = Array.from(tds).map(td => (td.textContent || '').replace(/\s+/g, ' ').trim());
+            if (cells.join("").trim()) allRows.push(cells);
+        } else {
+            for(let pIdx = 0; pIdx < maxP; pIdx++) {
+                const cells = Array.from(tds).map(td => {
+                    const ps = td.querySelectorAll('p');
+                    if (ps.length > pIdx) return (ps[pIdx].textContent || '').replace(/\s+/g, ' ').trim();
+                    else if (ps.length === 0 && pIdx === 0) return (td.textContent || '').replace(/\s+/g, ' ').trim();
+                    return "";
+                });
+                if (cells.join("").trim()) allRows.push(cells);
+            }
+        }
+      }
+    }
+  }
+
+
+  
+  const results = [];
+  let currentEventCode = null;
+  let currentEventName = null;
+  let currentHeat = null;
+
+  // Process rows sequentially to maintain Event/Heat state
+  for (let i = 0; i < allRows.length; i++) {
+    const cells = allRows[i].map(c => c.trim()).filter(c => c.length > 0);
+    if (!cells || cells.length === 0) continue;
+
+    const fullRowText = cells.join(" ").toLowerCase();
+
+    // 1. Detect Event Header (e.g. "Event 101 Girls 12 & Over 1500 LC Meter Freestyle")
+    if (fullRowText.includes("event") && cells.some(c => (/event\s+\d+/i).test(c))) {
+        const eventStr = allRows[i].join(" "); // keep original casing
+        const eventMatch = eventStr.match(/Event\s+(\d+)\s+(.+)/i);
+        if (eventMatch) {
+            currentEventCode = eventMatch[1].trim();
+            currentEventName = eventMatch[2].trim();
+            currentHeat = 1; // Reset heat on new event
+        }
+        continue;
+    }
+
+    // 2. Detect standalone Heat Header (e.g. "Heat" in cell 0, "2 of 2 Timed Finals" in cell 1)
+    if (cells.length <= 4 && cells[0].toLowerCase().includes('heat')) {
+        let hMatch = cells.join(" ").match(/heat\s+(\d+)/i);
+        if (!hMatch && cells[1] && cells[1].includes("of")) {
+            hMatch = cells[1].match(/^(\d+)/);
+        }
+        if (hMatch) {
+            currentHeat = parseInt(hMatch[1], 10);
+        }
+        continue;
+    }
+
+    // 3. Detect Athlete Row (Typically 5+ columns with Lane, Name, Age, Team, Seed, Final)
+    if (cells.length >= 5 && !fullRowText.includes('event') && !fullRowText.includes('lane')) {
+        let laneVal = null;
+        let rankVal = null;
+        let nextHeat = null;
+        
+        let firstCell = cells[0].replace(/\D/g, ''); // strip out "Heat" words if they got mashed
+        if (firstCell && /^\d+$/.test(firstCell)) {
+            let num = parseInt(firstCell, 10);
+            if (num > 0 && num <= 10) laneVal = num; // swim lanes are usually 1-10
+            else rankVal = num;
+        }
+
+        let rawName = cells[1] || "";
+
+        // Sometimes Heat is mashed into the Lane column ("6 Heat") with values ("2 of 2") in Name column
+        if (cells[0].toLowerCase().includes("heat")) {
+            const heatNumMatch = rawName.match(/(\d+)\s+of\s+\d+/i);
+            if (heatNumMatch) {
+               nextHeat = parseInt(heatNumMatch[1], 10);
+               rawName = rawName.replace(/\d+\s+of\s+\d+.*?$/i, '').trim();
+            } else {
+               const cell0Match = cells[0].match(/heat\s+(\d+)/i);
+               if (cell0Match) nextHeat = parseInt(cell0Match[1], 10);
+            }
+        }
+
+        // Standard Meet Manager Columns
+        const rawAge = cells[2];
+        const rawTeam = cells[3];
+        const rawSeed = cells[4];
+        const rawFinal = (cells.length > 5) ? cells[5] : null;
+
+        if (rawName && rawName.length > 2 && !rawName.toLowerCase().includes("name")) {
+            let formattedName = rawName;
+            if (formattedName.includes(',')) {
+                const parts = formattedName.split(',');
+                if (parts.length === 2) {
+                    formattedName = `${parts[1].trim()} ${parts[0].trim()}`;
+                }
+            }
+
+            let ageVal = rawAge ? rawAge.replace(/\D/g, '') : null;
+
+            results.push({
+                eventCode: currentEventCode,
+                eventName: currentEventName,
+                heat: currentHeat || 1, // Athlete is in the current heat
+                lane: laneVal,
+                athleteName: formattedName,
+                age: ageVal ? parseInt(ageVal, 10) : null,
+                club: rawTeam,
+                seedTime: rawSeed && rawSeed.length > 3 ? rawSeed : null,
+                resultTime: rawFinal && rawFinal.length > 3 ? rawFinal : null,
+                rank: rankVal
+            });
+
+            // Apply newly discovered heat for subsequent rows
+            if (nextHeat !== null) {
+                currentHeat = nextHeat;
+            }
+        }
+    }
+  }
+
+
+  return results;
+}
+async function parseCompetitionPdf(file, type = 'heat_sheet') {
   const pdfjs = await getPdfJs();
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
@@ -74,7 +358,7 @@ export async function parseCompetitionPdf(file, type = 'heat_sheet') {
     { headersFound: false, bounds: { lane: null, name: null, age: null, team: null, time: null, rank: null, seedTime: null } }
   ];
 
-  const eventRegex = /(?:Event\s+)(\d+[A-Z]?\.?\d*)\s+([A-Z].+)/i;
+  const eventRegex = /(?:Event\s+)(\d+[A-Z]?\.?\d*)\s+(.+)/i;
   const heatRegex = /(?:Heat|#|Flight|Group)\s*(\d+)/i;
 
   // Sorting for Two-Column Support
@@ -119,7 +403,7 @@ export async function parseCompetitionPdf(file, type = 'heat_sheet') {
     let eventMatch = fullText.match(eventRegex);
     if (!eventMatch) {
        // Lookback or lookahead for numeric prefix if "Event" is missing but name looks like an event
-       const altMatch = fullText.match(/^(\d+[A-Z]?\.?\d*)\s+([A-Z].*(?:Men|Women|Boys|Girls|Mixed).*)/i);
+       const altMatch = fullText.match(/^(\d+[A-Z]?\.?\d*)\s+(.*\b(?:Men|Women|Boys|Girls|Mixed)\b.*)/i);
        if (altMatch) eventMatch = altMatch;
     }
     
@@ -153,8 +437,6 @@ export async function parseCompetitionPdf(file, type = 'heat_sheet') {
       const heatMatch = fullText.match(heatRegex);
       if (heatMatch) {
         currentHeat = parseInt(heatMatch[1], 10);
-        // Do NOT reset bounds here; they should persist across heats of the same event
-        continue;
       }
     }
 
@@ -248,7 +530,27 @@ export async function parseCompetitionPdf(file, type = 'heat_sheet') {
         }
       }
 
-      const cleanName = nameVal.trim();
+      let rawName = nameVal.trim();
+      let nextHeat = null;
+
+      // Filter mashed-in Heat artifacts from the Name string
+      const heatNumMatch = rawName.match(/(\d+)\s+of\s+\d+/i);
+      if (heatNumMatch) {
+          nextHeat = parseInt(heatNumMatch[1], 10);
+          rawName = rawName.replace(/heat\s+/i, '').replace(/\d+\s+of\s+\d+.*?$/i, '').trim();
+      } else {
+          const cell0Match = rawName.match(/heat\s+(\d+)/i);
+          if (cell0Match) {
+              nextHeat = parseInt(cell0Match[1], 10);
+              rawName = rawName.replace(/heat\s+\d+/i, '').trim();
+          }
+      }
+
+      if (nextHeat !== null) {
+          currentHeat = nextHeat; // Update heat for subsequent processing if it bled into the name
+      }
+
+      const cleanName = rawName;
       if (!cleanName || cleanName.toLowerCase() === 'empty' || cleanName === '---' || cleanName.length < 3) {
         continue;
       }
@@ -357,9 +659,14 @@ export function matchAthleteEvents(parsedRows, accreditationRecords) {
       const accNameNoMiddle = normalizeName(acc.name, true);
       const fuzzyNameMatch = exactName || (pdfNameNoMiddle === accNameNoMiddle) || (jwScore >= 0.94);
 
-      const exactAge = (pdfAge === null || pdfAge === undefined) ? true : Number(acc.age) === Number(pdfAge);
+      let exactAge = true;
+      if (pdfAge !== null && pdfAge !== undefined && acc.age !== null && acc.age !== undefined) {
+         // Tolerate +/- 1 year difference due to different calculation dates
+         exactAge = Math.abs(Number(acc.age) - Number(pdfAge)) <= 1;
+      }
+      
       const exactTeam = normAccTeam === normPdfTeam;
-      const teamOverlaps = normAccTeam && normPdfTeam && (normAccTeam.includes(normPdfTeam) || normPdfTeam.includes(normAccTeam));
+      const teamOverlaps = normAccTeam && normPdfTeam && (normAccTeam.includes(normPdfTeam) || normPdfTeam.includes(normAccTeam) || jaroWinkler(normAccTeam, normPdfTeam) > 0.85);
       
       // Cascade 1: Triple Match (Name + Age + Team) -> 1.0
       if (fuzzyNameMatch && exactAge && exactTeam) {
@@ -392,6 +699,15 @@ export function matchAthleteEvents(parsedRows, accreditationRecords) {
       if (jwScore >= 0.96 && exactAge) {
         matchConfidence = 0.85;
         matchLog = [`Fuzzy Match: Jaro-Winkler (${jwScore.toFixed(2)}) with age match.`];
+        accreditId = acc.id;
+        matched = true;
+        break;
+      }
+
+      // Cascade 5: Exact Name Match + Partial Team Match (Age mismatch permitted) -> 0.80
+      if (exactName && teamOverlaps) {
+        matchConfidence = 0.80;
+        matchLog = ["Fallback Match: Exact Name match and Club overlaps despite age mismatch."];
         accreditId = acc.id;
         matched = true;
         break;

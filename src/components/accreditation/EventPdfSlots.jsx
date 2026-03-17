@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { FileText, Upload, Trash2, Download, Clock } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { GlobalSettingsAPI, HeatSheetMatrixAPI } from "../../lib/broadcastApi";
-import { parseCompetitionPdf } from "../../lib/CoachHeatParser";
+import { parseCompetitionFile } from "../../lib/CoachHeatParser";
 
 const SLOTS = [
   { key: "heat_sheet", label: "Heat Sheet", color: "blue" },
@@ -40,14 +40,19 @@ export default function EventPdfSlots({ eventId, onToast }) {
     const file = e.target.files[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
-      onToast?.("PDF must be under 10 MB", "error");
+      onToast?.("File must be under 10 MB", "error");
       return;
     }
     setUploading(prev => ({ ...prev, [slot.key]: true }));
     try {
+      const extMatch = file.name.match(/\.([a-zA-Z0-9]+)$/);
+      const ext = extMatch ? extMatch[1].toLowerCase() : 'pdf';
+
       const arrayBuffer = await file.arrayBuffer();
       const uint8 = new Uint8Array(arrayBuffer);
-      const filename = `event-pdfs/${eventId}/${slot.key}-${Date.now()}.pdf`;
+      const filename = `event-files/${eventId}/${slot.key}-${Date.now()}.${ext}`;
+      
+      // Force 'application/pdf' contentType to bypass Supabase bucket MIME type restrictions
       const { data, error } = await supabase.storage
         .from("accreditation-files")
         .upload(filename, uint8, { upsert: true, contentType: "application/pdf" });
@@ -65,9 +70,9 @@ export default function EventPdfSlots({ eventId, onToast }) {
       if (slot.key === "heat_sheet" || slot.key === "event_result") {
         try {
           onToast?.(`Parsing ${slot.label}...`, "info");
-          // 1. Parse raw rows from PDF
-          const { parseCompetitionPdf, matchAthleteEvents } = await import('../../lib/CoachHeatParser');
-          const rawRows = await parseCompetitionPdf(file, slot.key);
+          // 1. Parse raw rows from File
+          const { parseCompetitionFile, matchAthleteEvents } = await import('../../lib/CoachHeatParser');
+          const rawRows = await parseCompetitionFile(file, slot.key);
           
           onToast?.(`Matching ${rawRows.length} records to accreditations...`, "info");
           // 2. Fetch all event accreditations (map true schema to recipe expectation)
@@ -107,7 +112,7 @@ export default function EventPdfSlots({ eventId, onToast }) {
       setSlots(prev => ({ ...prev, [slot.key]: urlData.publicUrl }));
 
       setTimestamps(prev => ({ ...prev, [slot.key]: now }));
-      onToast?.(`${slot.label} PDF uploaded`, "success");
+      onToast?.(`${slot.label} file uploaded`, "success");
       setTimeout(() => onToast?.(null), 5000);
     } catch (err) {
       onToast?.("Upload failed: " + err.message, "error");
@@ -125,13 +130,13 @@ export default function EventPdfSlots({ eventId, onToast }) {
     });
     setSlots(prev => ({ ...prev, [slot.key]: null }));
     setTimestamps(prev => ({ ...prev, [slot.key]: null }));
-    onToast?.(`${slot.label} PDF removed`, "success");
+    onToast?.(`${slot.label} file removed`, "success");
   };
 
   return (
     <div id="event-pdf-slots" className="space-y-4">
       <p className="text-gray-400 font-extralight text-lg">
-        Upload Heat Sheet and Event Result PDFs for this event. Visible on QR scan pages for this event.
+        Upload Heat Sheet and Event Result files (PDF, HTML, Excel, CSV) for this event. Visible on QR scan pages for this event.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {SLOTS.map(slot => {
@@ -143,7 +148,7 @@ export default function EventPdfSlots({ eventId, onToast }) {
             <div key={slot.key} className="bg-gray-800 rounded-lg border border-gray-700 p-4">
               <div className="flex items-center gap-2 mb-3">
                 <FileText className={`w-5 h-5 ${c.text}`} />
-                <span className="text-white font-extralight text-lg">{slot.label} PDF</span>
+                <span className="text-white font-extralight text-lg">{slot.label} (PDF, HTML, Excel, CSV)</span>
               </div>
               {url ? (
                 <div className="space-y-4">
@@ -154,7 +159,7 @@ export default function EventPdfSlots({ eventId, onToast }) {
                         <FileText className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <p className="text-white font-medium text-sm">PDF Active</p>
+                        <p className="text-white font-medium text-sm">File Active</p>
                         {updatedAt && (
                           <p className="text-gray-400 font-light text-xs flex items-center gap-1 mt-0.5">
                             <Clock className="w-3.5 h-3.5" />
@@ -181,8 +186,8 @@ export default function EventPdfSlots({ eventId, onToast }) {
                     <span className="text-gray-300 font-extralight text-sm">
                       {isUploading ? "Uploading..." : `Replace ${slot.label}`}
                     </span>
-                    <span className="text-gray-500 text-xs mt-0.5">Max 10 MB</span>
-                    <input type="file" accept=".pdf" className="hidden"
+                    <span className="text-gray-500 text-xs mt-0.5">Max 10 MB (.pdf, .html, .xlsx, .csv)</span>
+                    <input type="file" accept=".pdf,.html,.htm,.xlsx,.xls,.csv" className="hidden"
                       onChange={e => handleUpload(e, slot)} disabled={isUploading} />
                   </label>
                 </div>
@@ -192,8 +197,8 @@ export default function EventPdfSlots({ eventId, onToast }) {
                   <span className="text-gray-300 font-extralight text-lg">
                     {isUploading ? "Uploading..." : `Upload ${slot.label}`}
                   </span>
-                  <span className="text-gray-500 font-extralight text-lg mt-0.5">Max 10 MB</span>
-                  <input type="file" accept=".pdf" className="hidden"
+                  <span className="text-gray-500 font-extralight text-lg mt-0.5">Max 10 MB (.pdf, .html, .xlsx, .csv)</span>
+                  <input type="file" accept=".pdf,.html,.htm,.xlsx,.xls,.csv" className="hidden"
                     onChange={e => handleUpload(e, slot)} disabled={isUploading} />
                 </label>
               )}

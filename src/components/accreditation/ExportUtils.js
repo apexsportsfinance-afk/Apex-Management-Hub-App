@@ -6,10 +6,7 @@ import * as XLSX from "xlsx";
  * Export data to Excel file
  */
 export const exportToExcel = (data, filename = "export") => {
-  if (!data || data.length === 0) {
-    console.warn("No data to export");
-    return;
-  }
+  if (!data || data.length === 0) return;
 
   const exportData = data.map((row) => ({
     "Accreditation ID": row.accreditationId || "",
@@ -44,10 +41,7 @@ export const exportToExcel = (data, filename = "export") => {
  * Export table data to PDF
  */
 export const exportTableToPDF = async (data, columns, title = "Export") => {
-  if (!data || data.length === 0) {
-    console.warn("No data to export");
-    return;
-  }
+  if (!data || data.length === 0) return;
 
   const doc = new jsPDF({
     orientation: "landscape",

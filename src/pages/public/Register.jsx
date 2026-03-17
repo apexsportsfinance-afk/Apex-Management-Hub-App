@@ -447,8 +447,8 @@ export default function Register() {
             </motion.div>
             <h1 className="text-2xl font-bold text-slate-800 mb-3">Registration Submitted!</h1>
             <p className="text-lg text-slate-600 mb-6">
-              Your accreditation request for <span className="font-semibold text-cyan-700">{event.name}</span> has been submitted successfully.
-              You will receive an email notification once your application is reviewed.
+              Your accreditation request for <span className="font-semibold text-cyan-700">{event.name}</span> has been successfully submitted.
+              You will receive an email notification within 24 hours confirming whether your accreditation has been approved or rejected. Please make sure to check your spam/junk folder as well.
             </p>
             <div className="bg-white border-2 border-cyan-200 rounded-xl p-4 shadow-inner">
               <p className="text-lg text-slate-500 mb-1">Reference Email</p>

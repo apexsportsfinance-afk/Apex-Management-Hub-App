@@ -7,6 +7,21 @@ import { CardInner } from "./AccreditationCardPreview";
 const CARD_W_PX = 320;
 const CARD_H_PX = 454;
 
+/**
+ * Build a safe, consistent filename for a single accreditation card.
+ * Format: ClubName_FirstName LastName
+ * e.g. "Modern Swim Academy_Carla Sameh.pdf"
+ */
+export const buildCardFileName = (acc, ext = "pdf") => {
+  const club = (acc?.club || acc?.accreditation_club || "Unknown Club").trim();
+  const firstName = (acc?.firstName || acc?.first_name || "").trim();
+  const lastName = (acc?.lastName || acc?.last_name || "").trim();
+  const fullName = [firstName, lastName].filter(Boolean).join(" ") || "Unknown Athlete";
+  // Sanitize characters that are invalid in filenames
+  const safe = (s) => s.replace(/[\/\\:*?"<>|]/g, "-");
+  return `${safe(club)}_${safe(fullName)}.${ext}`;
+};
+
 export const PDF_SIZES = {
   card: { width: 85.6, height: 54, label: "ID Card (85.6x54 mm)" },
   a6: { width: 105, height: 148, label: "A6 (105x148 mm)" },
@@ -405,7 +420,6 @@ export const bulkDownloadPDFs = async (
 ) => {
   if (!accreditations || accreditations.length === 0) return;
 
-  const CONCURRENCY = 3;
   const scale = 3.125;
 
   try {
@@ -414,23 +428,25 @@ export const bulkDownloadPDFs = async (
     let completed = 0;
     let failed = 0;
 
-    for (let i = 0; i < accreditations.length; i += CONCURRENCY) {
-      const batch = accreditations.slice(i, i + CONCURRENCY);
-
-      await Promise.all(batch.map(async (acc) => {
-        try {
-          const pdf = await buildPDF(acc, event, zones, scale, sizeKey);
-          const pdfBlob = pdf.output("blob");
-          const fileName = `${acc.firstName || "Unknown"}_${acc.lastName || "Unknown"}_${acc.badgeNumber || acc.id || i}.pdf`;
-          zip.file(fileName, pdfBlob);
-          completed++;
-          onProgress?.(completed, accreditations.length, failed);
-        } catch (err) {
-          console.warn(`Failed PDF for ${acc.firstName} ${acc.lastName}:`, err);
-          failed++;
-          onProgress?.(completed, accreditations.length, failed);
-        }
-      }));
+    // Process ONE at a time to prevent DOM rendering race conditions
+    // (concurrent renders write to the same off-screen container and corrupt each other's output)
+    for (let i = 0; i < accreditations.length; i++) {
+      const acc = accreditations[i];
+      try {
+        const pdf = await buildPDF(acc, event, zones, scale, sizeKey);
+        const pdfBlob = pdf.output("blob");
+        // Use sequential index to guarantee unique, ordered filenames in the zip
+        const paddedIndex = String(i + 1).padStart(3, "0");
+        const baseName = buildCardFileName(acc, "pdf").replace(/\.pdf$/i, "");
+        const fileName = `${paddedIndex}_${baseName}.pdf`;
+        zip.file(fileName, pdfBlob);
+        completed++;
+        onProgress?.(completed, accreditations.length, failed);
+      } catch (err) {
+        console.warn(`Failed PDF for ${acc.firstName} ${acc.lastName}:`, err);
+        failed++;
+        onProgress?.(completed, accreditations.length, failed);
+      }
     }
 
     const zipBlob = await zip.generateAsync({ type: "blob" });

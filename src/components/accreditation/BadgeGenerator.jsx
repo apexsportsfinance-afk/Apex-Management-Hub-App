@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Download, Loader2, X, ExternalLink, Printer } from "lucide-react";
-import { downloadCardPDF, openCardPDF, printCard, PDF_SIZES } from "./cardExport";
+import { downloadCardPDF, openCardPDF, printCard, PDF_SIZES, buildCardFileName } from "./cardExport";
 
 export default function BadgeGenerator({ accreditation, event, zones = [], onClose, children }) {
   const [loading, setLoading] = useState(false);
@@ -14,8 +14,8 @@ export default function BadgeGenerator({ accreditation, event, zones = [], onClo
   };
 
   const handleDownloadPDF = () => withLoading(() => 
-    downloadCardPDF(accreditation, event, zones, 
-      `${accreditation?.firstName}_${accreditation?.lastName}_Badge_${accreditation?.badgeNumber || "card"}.pdf`,
+    downloadCardPDF(accreditation, event, zones,
+      buildCardFileName(accreditation, "pdf"),
       4, pdfSize)
   );
 
