@@ -459,7 +459,7 @@ export const CardInner = memo(function CardInner({ accreditation, event, zones =
             {event?.sponsorLogos?.length > 0 ? (
               event.sponsorLogos.slice(0, 6).map((logo, index) => (
                 logo ? (
-                  <div key={index} style={{ width: "45px", height: "26px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div key={index} style={{ flex: 1, minWidth: 0, height: "26px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <img src={logo} alt="Sponsor" style={{ width: "100%", height: "100%", objectFit: "contain" }} crossOrigin="anonymous" />
                   </div>
                 ) : null
