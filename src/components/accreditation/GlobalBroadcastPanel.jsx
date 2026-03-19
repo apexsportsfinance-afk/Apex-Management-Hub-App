@@ -169,6 +169,15 @@ function GlobalBroadcastPage({ eventId, onToast }) {
     if (!currentAttachment?.broadcastId) return;
     setDeletingAttachment(true);
     try {
+      // Physically delete the file from the Storage Bucket
+      if (currentAttachment.url && currentAttachment.url.includes('/public/accreditation-files/')) {
+        const path = currentAttachment.url.split('/public/accreditation-files/')[1];
+        if (path) {
+          const { error: storageErr } = await supabase.storage.from("accreditation-files").remove([path]);
+          if (storageErr) console.error("Failed to delete attachment from storage:", storageErr);
+        }
+      }
+
       const { error } = await supabase
         .from("broadcasts_v2")
         .update({ attachment_url: null, attachment_name: null })

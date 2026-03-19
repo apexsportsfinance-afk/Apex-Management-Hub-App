@@ -52,6 +52,15 @@ export default function EventPdfSlots({ eventId, onToast }) {
       const uint8 = new Uint8Array(arrayBuffer);
       const filename = `event-files/${eventId}/${slot.key}-${Date.now()}.${ext}`;
       
+      // 0. Proactively delete the legacy file from the bucket to save space
+      if (slots[slot.key] && slots[slot.key].includes('/public/accreditation-files/')) {
+        const oldPath = slots[slot.key].split('/public/accreditation-files/')[1];
+        if (oldPath) {
+          const { error: delErr } = await supabase.storage.from("accreditation-files").remove([oldPath]);
+          if (delErr) console.error("Failed to cleanly drop legacy file from storage:", delErr);
+        }
+      }
+
       // Force 'application/pdf' contentType to bypass Supabase bucket MIME type restrictions
       const { data, error } = await supabase.storage
         .from("accreditation-files")
@@ -142,6 +151,14 @@ export default function EventPdfSlots({ eventId, onToast }) {
          if (deletedCount > 0) {
             onToast?.(`Cleared ${deletedCount} cached athlete events`, "info");
          }
+      }
+
+      // Proactively delete the active file from the cloud bucket
+      if (slots[slot.key] && slots[slot.key].includes('/public/accreditation-files/')) {
+        const activePath = slots[slot.key].split('/public/accreditation-files/')[1];
+        if (activePath) {
+          await supabase.storage.from("accreditation-files").remove([activePath]);
+        }
       }
 
       await GlobalSettingsAPI.setMany({

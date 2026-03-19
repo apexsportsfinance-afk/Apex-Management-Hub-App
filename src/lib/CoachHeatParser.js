@@ -242,6 +242,10 @@ async function parseCompetitionHtml(file, type = 'heat_sheet') {
   let currentEventCode = null;
   let currentEventName = null;
   let currentHeat = null;
+  let currentEventRecords = [];
+  
+  // Regex to extract Benchmark Records (e.g., "12 DIAC: 1:08.46" or "16&O DIAC: 1:02.10")
+  const eventRecordsRegex = /^(\d{1,2}(?:\s*&\s*O(?:ver)?)?|\d{1,2}\s*&\s*[a-zA-Z]+|\d{1,2}|[A-Za-z]+)\s+([A-Z0-9]+):\s+(\d{1,2}:\d{2}\.\d{2}|\d{2}\.\d{2})/;
 
   // Process rows sequentially to maintain Event/Heat state
   for (let i = 0; i < allRows.length; i++) {
@@ -259,8 +263,23 @@ async function parseCompetitionHtml(file, type = 'heat_sheet') {
             currentEventCode = eventMatch[1].trim();
             currentEventName = eventMatch[2].trim();
             currentHeat = 1; // Reset heat on new event
+            currentEventRecords = []; // Reset records
         }
         continue;
+    }
+    
+    // 1b. Detect Event Records immediately following the Event Header
+    if (currentEventCode && !fullRowText.includes('event') && !fullRowText.includes('heat') && !fullRowText.includes('lane') && !fullRowText.includes('name')) {
+        const recordStr = allRows[i].join(" ");
+        const recordMatch = recordStr.match(eventRecordsRegex);
+        if (recordMatch) {
+            currentEventRecords.push({
+                age: recordMatch[1].replace(/\s+/g, ""), 
+                acronym: recordMatch[2],
+                time: recordMatch[3]
+            });
+            continue;
+        }
     }
 
     // 2. Detect standalone Heat Header (e.g. "Heat" in cell 0, "2 of 2 Timed Finals" in cell 1)
@@ -337,9 +356,15 @@ async function parseCompetitionHtml(file, type = 'heat_sheet') {
                 currentHeat = nextHeat;
             }
 
+            // Execute the String-Packing maneuver to smuggle JSON payloads into the Database text field 
+            let packedEventName = currentEventName;
+            if (currentEventRecords && currentEventRecords.length > 0) {
+               packedEventName += " |||RECORD_DATA||| " + JSON.stringify(currentEventRecords);
+            }
+
             results.push({
                 eventCode: currentEventCode,
-                eventName: currentEventName,
+                eventName: packedEventName,
                 heat: currentHeat || 1, // Athlete is in the current heat
                 lane: laneVal,
                 athleteName: formattedName,

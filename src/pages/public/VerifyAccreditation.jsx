@@ -521,27 +521,85 @@ export default function VerifyAccreditation() {
               {/* Competition Events — all events from PDF + registration */}
               {mergedEvents.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
-                  <div className="space-y-2">
-                    {mergedEvents.map((ev, i) => (
-                      <div key={i} className="flex items-center gap-3">
-                        <span className="font-bold text-black bg-blue-50 px-2 py-1 rounded text-xs w-8 text-center flex-shrink-0">
-                          {ev.event_code || ev._ev?.eventCode}
-                        </span>
-                        <span className="text-gray-700 text-xs flex-1">
-                          {ev.event_name || ev._ev?.eventName}
-                        </span>
-                        {ev.heat && ev.lane && (
-                          <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold whitespace-nowrap">
-                            HEAT {ev.heat} • LANE {ev.lane}
-                          </span>
-                        )}
-                        {ev.rank && (
-                          <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold whitespace-nowrap">
-                            RANK {ev.rank}{ev.result_time ? ` • ${ev.result_time}` : ''}
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    {mergedEvents.map((ev, i) => {
+                      let displayName = ev.event_name || ev._ev?.eventName || "";
+                      let eventRecords = null;
+                      
+                      // Unpack the JSON String-Packing payload safely
+                      if (displayName.includes("|||RECORD_DATA|||")) {
+                        const parts = displayName.split("|||RECORD_DATA|||");
+                        displayName = parts[0].trim();
+                        try {
+                          eventRecords = JSON.parse(parts[1].trim());
+                        } catch(e) {
+                          console.error("Failed to parse packed event records", e);
+                        }
+                      }
+
+                      // Mathematically sync the Overall Record Time relative to the athlete's exact database age
+                      let ageRecord = null;
+                      if (eventRecords && eventRecords.length > 0) {
+                         if (data.date_of_birth) {
+                             const athleteAge = calculateAge(data.date_of_birth, new Date().getFullYear());
+                             ageRecord = eventRecords.find(r => {
+                                if (r.age.includes("&")) {
+                                   const baseAge = parseInt(r.age, 10);
+                                   return athleteAge >= baseAge;
+                                }
+                                return parseInt(r.age, 10) === athleteAge;
+                             });
+                         }
+                         // FOOLPROOF FALLBACK: If Date of Birth is missing OR Age didn't exactly align, render the top record
+                         if (!ageRecord) {
+                             ageRecord = eventRecords[0]; 
+                         }
+                      }
+
+                      return (
+                        <div key={i} className="flex flex-col gap-1.5 border-b border-gray-100 pb-3 last:border-0 relative">
+                          <div className="flex items-center gap-3">
+                            <span className="font-bold text-black bg-blue-50 px-2 py-1 rounded text-xs w-8 text-center flex-shrink-0">
+                              {ev.event_code || ev._ev?.eventCode}
+                            </span>
+                            <span className="text-gray-700 text-xs flex-1">
+                              {displayName}
+                            </span>
+                            {ev.heat && ev.lane && (
+                              <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold whitespace-nowrap">
+                                HEAT {ev.heat} • LANE {ev.lane}
+                              </span>
+                            )}
+                            {ev.rank && (
+                              <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold whitespace-nowrap">
+                                RANK {ev.rank}{ev.result_time ? ` • ${ev.result_time}` : ''}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Record Details & Entry Time Secondary Row - STRICT ALIGNMENT */}
+                          {(ageRecord || ev.seed_time) && (
+                            <div className="flex items-center justify-between w-full pl-11 mt-0.5">
+                               <div className="flex items-center justify-start">
+                                   {ageRecord && (
+                                      <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm uppercase">
+                                        <svg className="w-3 h-3 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+                                        {ageRecord.age} {ageRecord.acronym} Record : {ageRecord.time}
+                                      </span>
+                                   )}
+                               </div>
+                               <div className="flex items-center justify-end">
+                                   {ev.seed_time && (
+                                      <span className="bg-gray-100 text-gray-600 border border-gray-200 px-2 py-0.5 rounded text-[10px] font-bold shadow-sm uppercase">
+                                        PB: {ev.seed_time}
+                                      </span>
+                                   )}
+                               </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -574,14 +632,25 @@ export default function VerifyAccreditation() {
 
         {/* Message Attachments Section */}
         {(() => {
-          // Find all unique attachments from both personal and global messages
           const attachments = [];
           const seenUrls = new Set();
           
+          let hasGlobalAttachment = false;
+          let hasPersonalAttachment = false;
+          
           filteredMessages.allMessages.forEach(m => {
             if (m.attachmentUrl && !seenUrls.has(m.attachmentUrl)) {
-              attachments.push(m);
-              seenUrls.add(m.attachmentUrl);
+              const isGlobal = m.type === 'global';
+              
+              if (isGlobal && !hasGlobalAttachment) {
+                attachments.push(m);
+                seenUrls.add(m.attachmentUrl);
+                hasGlobalAttachment = true;
+              } else if (!isGlobal && !hasPersonalAttachment) {
+                attachments.push(m);
+                seenUrls.add(m.attachmentUrl);
+                hasPersonalAttachment = true;
+              }
             }
           });
 

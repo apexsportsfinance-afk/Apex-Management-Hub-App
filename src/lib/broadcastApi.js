@@ -322,16 +322,48 @@ export const BroadcastV2API = {
 
   // Send global broadcast
   sendGlobal: async (message, eventId, attachmentUrl = null, attachmentName = null) => {
-    const insertData = {
-      message,
-      event_id: eventId,
-      type: 'global',
-      attachment_url: attachmentUrl || null,
-      attachment_name: attachmentName || null,
-      created_at: new Date().toISOString()
-    };
-    
     try {
+      // If a NEW attachment is being uploaded, proactively wipe all legacy attachments
+      if (attachmentUrl) {
+         const { data: oldBroadcasts } = await supabase
+           .from("broadcasts_v2")
+           .select("id, attachment_url")
+           .eq("event_id", eventId)
+           .eq("type", "global")
+           .not("attachment_url", "is", null);
+
+         if (oldBroadcasts && oldBroadcasts.length > 0) {
+           // 1. Physically delete old file blobs from the storage bucket
+           const pathsToDelete = oldBroadcasts
+             .map(b => b.attachment_url)
+             .filter(url => url && url.includes('/public/accreditation-files/'))
+             .map(url => url.split('/public/accreditation-files/')[1]);
+             
+           if (pathsToDelete.length > 0) {
+             const { error: storageErr } = await supabase.storage.from("accreditation-files").remove(pathsToDelete);
+             if (storageErr) console.error("Failed to delete legacy global storage blobs:", storageErr);
+           }
+
+           // 2. Clear the attachment references off the legacy broadcast rows
+           const oldIds = oldBroadcasts.map(b => b.id);
+           const { error: dbErr } = await supabase
+             .from("broadcasts_v2")
+             .update({ attachment_url: null, attachment_name: null })
+             .in("id", oldIds);
+             
+           if (dbErr) console.error("Failed to detach legacy global URLs:", dbErr);
+         }
+      }
+
+      const insertData = {
+        message,
+        event_id: eventId,
+        type: 'global',
+        attachment_url: attachmentUrl || null,
+        attachment_name: attachmentName || null,
+        created_at: new Date().toISOString()
+      };
+      
       const { data, error } = await supabase
         .from("broadcasts_v2")
         .insert(insertData)
@@ -546,6 +578,7 @@ export const AthleteEventsAPI = {
         lane,
         round,
         session_time,
+        seed_time,
         matched,
         match_confidence
       `)
