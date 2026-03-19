@@ -162,49 +162,14 @@ export default function VerifyAccreditation() {
     }
   }, [filteredMessages.allMessages, loading, data]);
 
-  // Build a unified event list by merging both sources:
-  // 1. Start with all securely matched events from athlete_events
-  // 2. Add any events from selectedEvents not already covered by the database match
+  // Display ONLY securely matched events from the uploaded Heat Sheet (athlete_events database)
   const mergedEvents = React.useMemo(() => {
     if (!data) return [];
     
     // Database rows that match this athlete's ID exactly
-    const matrixRows = [...athleteMatrix]
-      .sort((a, b) => Number(a.event_code) - Number(b.event_code));
+    const matrixRows = [...athleteMatrix];
 
-    // Track which event codes we already have from matrix
-    const coveredCodes = new Set(matrixRows.map(m => String(m.event_code || '').padStart(3, '0')));
-    
-    const rawSel = data.selected_sport_events || data.selected_events;
-    let selectedEvents = [];
-    let currentSel = rawSel;
-    if (typeof currentSel === 'string') {
-      try { currentSel = JSON.parse(currentSel); } catch(e) {}
-    }
-    if (typeof currentSel === 'string') {
-      try { currentSel = JSON.parse(currentSel); } catch(e) {}
-    }
-    if (Array.isArray(currentSel)) {
-      selectedEvents = currentSel;
-    }
-
-    // Convert selectedEvents entries not already in matrix into synthetic rows
-    const extraFromSelected = selectedEvents
-      .filter(ev => {
-        const code = String(ev.eventCode || ev.event_code || '').trim().padStart(3, '0');
-        return !coveredCodes.has(code);
-      })
-      .map(ev => ({
-        event_code: ev.eventCode || ev.event_code || '',
-        event_name: ev.eventName || ev.event_name || 'Unknown Event',
-        athlete_name: `${data.first_name} ${data.last_name}`,
-        heat: ev.heat || null, lane: ev.lane || null, rank: null, result_time: null,
-        _fromSelected: true,
-        _ev: ev
-      }));
-
-    return [...matrixRows, ...extraFromSelected]
-      .sort((a, b) => {
+    return matrixRows.sort((a, b) => {
         const numA = parseInt(a.event_code, 10);
         const numB = parseInt(b.event_code, 10);
         if (isNaN(numA) && isNaN(numB)) return String(a.event_code).localeCompare(String(b.event_code));

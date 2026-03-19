@@ -20,6 +20,7 @@ export default function QRSystem() {
   }, []);
 
   const handleToast = (msg, type = "success") => {
+    if (!msg) return;
     if (type === "success") toast.success(msg);
     else if (type === "error") toast.error(msg);
     else if (type === "info") toast.info(msg);
