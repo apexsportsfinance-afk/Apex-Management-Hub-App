@@ -592,6 +592,130 @@ export const AccreditationsAPI = {
   }
 };
 
+// --- TICKETING API ---
+export const TicketingAPI = {
+  getTypes: async (eventId) => {
+    const data = await handleResponse(
+      supabase.from("ticket_types").select("*").eq("event_id", eventId).order("created_at", { ascending: true })
+    );
+    return (data || []).map(mapTicketTypeFromDB);
+  },
+  createType: async (type) => {
+    const dbType = mapTicketTypeToDB(type);
+    const data = await handleResponse(
+      supabase.from("ticket_types").insert([dbType]).select().single()
+    );
+    return mapTicketTypeFromDB(data);
+  },
+  updateType: async (id, updates) => {
+    const dbUpdates = mapTicketTypeToDB(updates);
+    delete dbUpdates.id;
+    const data = await handleResponse(
+      supabase.from("ticket_types").update(dbUpdates).eq("id", id).select().single()
+    );
+    return mapTicketTypeFromDB(data);
+  },
+  deleteType: async (id) => {
+    await handleResponse(supabase.from("ticket_types").delete().eq("id", id));
+  },
+
+  getPackages: async (eventId) => {
+    const data = await handleResponse(
+      supabase.from("ticket_packages").select("*").eq("event_id", eventId).order("created_at", { ascending: true })
+    );
+    return (data || []).map(mapTicketPackageFromDB);
+  },
+  createPackage: async (pkg) => {
+    const dbPkg = mapTicketPackageToDB(pkg);
+    const data = await handleResponse(
+      supabase.from("ticket_packages").insert([dbPkg]).select().single()
+    );
+    return mapTicketPackageFromDB(data);
+  },
+  updatePackage: async (id, updates) => {
+    const dbUpdates = mapTicketPackageToDB(updates);
+    delete dbUpdates.id;
+    const data = await handleResponse(
+      supabase.from("ticket_packages").update(dbUpdates).eq("id", id).select().single()
+    );
+    return mapTicketPackageFromDB(data);
+  },
+  deletePackage: async (id) => {
+    await handleResponse(supabase.from("ticket_packages").delete().eq("id", id));
+  },
+
+  getOrders: async (eventId) => {
+    const { data } = await handleResponse(
+      supabase
+        .from("spectator_orders")
+        .select("*")
+        .eq("event_id", eventId)
+        .order("created_at", { ascending: false })
+    );
+    return data || [];
+  },
+
+  createOrder: async (order) => {
+    // Generate a unique QR code ID if not provided
+    const qrCodeId = order.qrCodeId || `spec_${Math.random().toString(36).substr(2, 9)}`;
+    const dbOrder = {
+      event_id: order.eventId,
+      customer_name: order.customerName,
+      customer_email: order.customerEmail,
+      total_amount: order.totalAmount,
+      ticket_count: order.ticketCount,
+      payment_status: order.paymentStatus || 'pending',
+      payment_provider: order.paymentProvider || 'stripe',
+      qr_code_id: qrCodeId,
+      scanned_count: 0,
+      selected_dates: order.selectedDates || []
+    };
+    const data = await handleResponse(
+      supabase.from("spectator_orders").insert([dbOrder]).select().single()
+    );
+    return data;
+  },
+
+  validateOrder: async (qrCodeId) => {
+    const data = await handleResponse(
+      supabase.from("spectator_orders")
+        .select("*")
+        .eq("qr_code_id", qrCodeId)
+        .single()
+    );
+    return data;
+  },
+
+  redeemTickets: async (orderId, count) => {
+    // Increment scanned_count in DB
+    const { data: order, error: fetchError } = await supabase
+      .from("spectator_orders")
+      .select("scanned_count, ticket_count")
+      .eq("id", orderId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    const newScanned = (order.scanned_count || 0) + count;
+    if (newScanned > order.ticket_count) {
+      throw new Error(`Cannot redeem ${count} tickets. Only ${order.ticket_count - order.scanned_count} remaining.`);
+    }
+
+    const { data, error } = await supabase
+      .from("spectator_orders")
+      .update({ 
+        scanned_count: newScanned,
+        last_scanned_at: new Date().toISOString()
+      })
+      .eq("id", orderId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+};
+
 // --- MAPPERS ---
 
 function mapEventToDB(event) {
@@ -766,6 +890,58 @@ function mapAccreditationFromDB(db) {
     forceLive: db.force_live || false,
     heatSheetUpdatedAt: db.heat_sheet_updated_at,
     eventResultUpdatedAt: db.event_result_updated_at
+  };
+}
+
+function mapTicketTypeToDB(type) {
+  const map = {};
+  if (type.eventId !== undefined) map.event_id = type.eventId;
+  if (type.name !== undefined) map.name = type.name;
+  if (type.description !== undefined) map.description = type.description;
+  if (type.price !== undefined) map.price = type.price;
+  if (type.currency !== undefined) map.currency = type.currency;
+  if (type.capacity !== undefined) map.capacity = type.capacity;
+  if (type.isActive !== undefined) map.is_active = type.isActive;
+  return map;
+}
+
+function mapTicketTypeFromDB(db) {
+  if (!db) return null;
+  return {
+    id: db.id,
+    eventId: db.event_id,
+    name: db.name,
+    description: db.description,
+    price: db.price,
+    currency: db.currency,
+    capacity: db.capacity,
+    isActive: db.is_active,
+    createdAt: db.created_at
+  };
+}
+
+function mapTicketPackageToDB(pkg) {
+  const map = {};
+  if (pkg.eventId !== undefined) map.event_id = pkg.eventId;
+  if (pkg.name !== undefined) map.name = pkg.name;
+  if (pkg.description !== undefined) map.description = pkg.description;
+  if (pkg.price !== undefined) map.price = pkg.price;
+  if (pkg.quantityIncluded !== undefined) map.quantity_included = pkg.quantityIncluded;
+  if (pkg.isActive !== undefined) map.is_active = pkg.isActive;
+  return map;
+}
+
+function mapTicketPackageFromDB(db) {
+  if (!db) return null;
+  return {
+    id: db.id,
+    eventId: db.event_id,
+    name: db.name,
+    description: db.description,
+    price: db.price,
+    quantityIncluded: db.quantity_included,
+    isActive: db.is_active,
+    createdAt: db.created_at
   };
 }
 

@@ -310,12 +310,20 @@ export const COUNTRIES = [
 ];
 
 export const getCountryName = (code) => {
-  const country = COUNTRIES.find(c => c.code === code);
+  if (!code) return "";
+  const country = COUNTRIES.find(c => 
+    c.code?.toUpperCase() === code.toUpperCase() || 
+    c.name?.toLowerCase() === code.toLowerCase()
+  );
   return country?.name || code;
 };
 
 export const getCountryFlag = (code) => {
-  const country = COUNTRIES.find(c => c.code === code);
+  if (!code) return null;
+  const country = COUNTRIES.find(c => 
+    c.code?.toUpperCase() === code.toUpperCase() || 
+    c.name?.toLowerCase() === code.toLowerCase()
+  );
   if (country?.flag) {
     return `https://flagcdn.com/w80/${country.flag.toLowerCase()}.png`;
   }

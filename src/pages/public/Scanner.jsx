@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Camera, CheckCircle, AlertCircle, Info, Lock, LogOut, RefreshCcw, Eye, EyeOff } from "lucide-react";
-import { AccreditationsAPI } from "../../lib/storage";
+import { AccreditationsAPI, TicketingAPI, EventsAPI } from "../../lib/storage";
 import { AttendanceAPI } from "../../lib/attendanceApi";
-import { EventsAPI } from "../../lib/storage"; // Needed to lookup event slug mapping if URL has slug
 
 export default function ScannerPage() {
   const [authorized, setAuthorized] = useState(false);
@@ -110,7 +109,42 @@ export default function ScannerPage() {
 
     try {
       // 1. Parse token non-destructively
-      let token = decodedText;
+      let token = decodedText.trim();
+      
+      // Handle Spectator QR
+      if (token.startsWith("spec_")) {
+        const order = await TicketingAPI.validateOrder(token);
+        if (!order) {
+          setLastScanResult({
+            status: "error",
+            message: "Invalid spectator ticket QR code."
+          });
+          setTimeout(resumeScanner, 3000);
+          return;
+        }
+
+        if (order.event_id !== config.eventId) {
+          setLastScanResult({
+            status: "error",
+            message: "This ticket is for a different event."
+          });
+          setTimeout(resumeScanner, 3000);
+          return;
+        }
+
+        const remaining = order.ticket_count - (order.scanned_count || 0);
+        setLastScanResult({
+          status: remaining > 0 ? "success" : "duplicate",
+          type: "spectator",
+          order,
+          remaining,
+          message: remaining > 0 ? `Valid Order: ${remaining} of ${order.ticket_count} remaining.` : "All tickets in this order have been redeemed."
+        });
+        
+        // Don't auto-resume for spectators, wait for them to click "Redeem" or "Close"
+        return;
+      }
+
       if (token.includes("/verify/")) {
         token = token.split("/verify/").pop();
       }
@@ -195,6 +229,30 @@ export default function ScannerPage() {
         message: "An unexpected error occurred during scan process."
       });
       setTimeout(resumeScanner, 3000);
+    }
+  };
+
+  const handleRedeem = async (count) => {
+    if (!lastScanResult || !lastScanResult.order) return;
+    setProcessing(true);
+    try {
+      const updatedOrder = await TicketingAPI.redeemTickets(lastScanResult.order.id, count);
+      const remaining = updatedOrder.ticket_count - updatedOrder.scanned_count;
+      
+      setLastScanResult({
+        ...lastScanResult,
+        status: remaining > 0 ? "success" : "duplicate",
+        order: updatedOrder,
+        remaining,
+        message: `Successfully redeemed ${count} ticket${count > 1 ? 's' : ''}. ${remaining} remaining.`
+      });
+      
+      toast.success(`Redeemed ${count} ticket${count > 1 ? 's' : ''}`);
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Redemption failed");
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -372,6 +430,74 @@ export default function ScannerPage() {
                          <span className="px-2 py-0.5 bg-gray-900 rounded border border-gray-700 text-gray-400 text-xs font-bold uppercase">{lastScanResult.athlete.country}</span>
                       )}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Spectator Order Data (if present) */}
+              {lastScanResult.type === 'spectator' && lastScanResult.order && (
+                <div className="space-y-4">
+                  <div className="bg-gray-800 border-2 border-dashed border-gray-700 rounded-2xl p-6 text-center">
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-1">{lastScanResult.order.customer_name}</h3>
+                    <p className="text-gray-400 text-sm mb-4">{lastScanResult.order.customer_email}</p>
+                    
+                    {lastScanResult.order.selected_dates && lastScanResult.order.selected_dates.length > 0 ? (
+                      <div className="mb-4 text-left px-2">
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                          <Calendar className="w-3 h-3" /> Attendance Days
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {lastScanResult.order.selected_dates.map(date => (
+                            <span key={date} className="px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold rounded uppercase">
+                              {new Date(date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mb-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                        <p className="text-amber-500 font-black text-xs uppercase tracking-widest">Full Event Access</p>
+                      </div>
+                    )}
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-gray-950 p-3 rounded-xl border border-gray-800">
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Total Tickets</p>
+                        <p className="text-2xl font-black text-white">{lastScanResult.order.ticket_count}</p>
+                      </div>
+                      <div className="bg-gray-950 p-3 rounded-xl border border-gray-800">
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Total Scanned</p>
+                        <p className="text-2xl font-black text-emerald-400">{lastScanResult.order.scanned_count || 0}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => resumeScanner()}
+                      className="flex-1 py-4 rounded-2xl bg-gray-800 text-gray-400 font-bold hover:bg-gray-700 transition-all border border-gray-700"
+                    >
+                      Close
+                    </button>
+                    {lastScanResult.remaining > 0 && (
+                      <button 
+                        onClick={() => handleRedeem(1)}
+                        className="flex-[2] py-4 rounded-2xl bg-emerald-600 text-white font-bold hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-900/30 flex items-center justify-center gap-2"
+                        disabled={processing}
+                      >
+                        {processing ? <RefreshCcw className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+                        Redeem 1 Ticket
+                      </button>
+                    )}
+                    {lastScanResult.remaining > 1 && (
+                      <button 
+                        onClick={() => handleRedeem(lastScanResult.remaining)}
+                        className="flex-[2] py-4 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2"
+                        disabled={processing}
+                      >
+                         Redeem All ({lastScanResult.remaining})
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

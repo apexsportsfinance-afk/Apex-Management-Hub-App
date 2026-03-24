@@ -2,6 +2,7 @@ const SUPABASE_URL = "https://dixelomafeobabahqeqg.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpeGVsb21hZmVvYmFiYWhxZXFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzMzA4MzYsImV4cCI6MjA4NjkwNjgzNn0.YD1lj0T6kFoM2XyeYonIC3bmLiPkKBvmXEHEr5VMaGM";
 
 import { supabase } from "./supabase";
+import { generateTicketAttachment } from "./pdfTicketHelper";
 
 export const getEmailTemplate = async (templateType) => {
   try {
@@ -250,3 +251,87 @@ export const sendAccreditationEmail = async ({
     });
   }
 };
+
+export const sendTicketEmail = async ({
+  to,
+  name,
+  eventName,
+  ticketCount,
+  amountPaid,
+  paymentMethod,
+  eventData,
+  qrCodeDataUrl,
+  qrCodeId
+}) => {
+  try {
+    const template = await getEmailTemplate("ticket_delivery");
+    let subject = `Booking Confirmation - {eventName}`;
+    let body = "Dear {name},\n\nThank you for booking your ticket(s) with us. We are thrilled to welcome you to {eventName}!\n\nAttached to this email, you will find your official e-ticket(s). Please review your booking details carefully:\n\nEvent: {eventName}\nTotal Tickets: {ticketCount} Person(s)\nAmount Paid: {amountPaid} AED\nPayment Method: {paymentMethod}\nReference ID: {qrCodeId}\n\nPlease keep this email safe and present the attached QR code at the event entrance for scanning. To ensure a smooth entry, please have your ID ready as it may be required for verification.\n\nIf you have any questions or require any assistance, simply reply directly to this email.\n\nWe hope you thoroughly enjoy the event!\n\nWarm regards,\nThe Apex Sports Team";
+
+    // Prepare variables for placeholder replacement
+    const vars = {
+      name: name || "Customer",
+      firstName: name?.split(" ")[0] || "Customer",
+      lastName: name?.split(" ").slice(1).join(" ") || "",
+      eventName,
+      ticketCount,
+      amountPaid,
+      paymentMethod,
+      qrCodeId
+    };
+    
+    const replacePlaceholders = (text, v) => {
+      if (!text) return text;
+      return text
+        .replace(/\{name\}/g, v.name)
+        .replace(/\{firstName\}/g, v.firstName)
+        .replace(/\{lastName\}/g, v.lastName)
+        .replace(/\{eventName\}/g, v.eventName)
+        .replace(/\{ticketCount\}/g, v.ticketCount)
+        .replace(/\{amountPaid\}/g, v.amountPaid)
+        .replace(/\{paymentMethod\}/g, v.paymentMethod)
+        .replace(/\{qrCodeId\}/g, v.qrCodeId);
+    };
+
+    if (template && template.body && template.body.trim() !== '') {
+      body = replacePlaceholders(template.body, vars);
+      subject = replacePlaceholders(template.subject, vars);
+    } else {
+      body = replacePlaceholders(body, vars);
+      subject = replacePlaceholders(subject, vars);
+    }
+
+    // Generate Visual PDF Ticket via helper using exactly the same component layout!
+    // order format needs customer_name, ticket_count, qr_code_id
+    const orderFormat = { 
+      customer_name: name, 
+      ticket_count: ticketCount, 
+      qr_code_id: qrCodeId, 
+      selected_dates: [] 
+    };
+
+    let pdfBase64 = null;
+    let pdfFileName = `${eventName.replace(/[^a-z0-9]/gi, '_')}_Ticket.pdf`;
+
+    if (eventData) {
+      const result = await generateTicketAttachment(orderFormat, eventData, qrCodeDataUrl);
+      if (result) {
+        pdfBase64 = result.pdfBase64;
+        pdfFileName = result.pdfFileName;
+      }
+    }
+
+    return sendCustomEmail({
+      to,
+      name,
+      subject,
+      body,
+      pdfBase64,
+      pdfFileName
+    });
+  } catch (error) {
+    console.error("[Email] Ticket email failed to generate/send:", error);
+    return { success: false, error: error.message };
+  }
+};
+

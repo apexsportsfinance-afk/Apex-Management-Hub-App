@@ -74,6 +74,13 @@ export default function InviteRegister() {
           return;
         }
 
+        if (result.link) {
+          setFormData(prev => ({
+            ...prev,
+            role: result.link.role || prev.role,
+            club: result.link.club || prev.club
+          }));
+        }
         setInviteLink(result.link);
 
         // Load categories, clubs, etc.
@@ -373,31 +380,39 @@ export default function InviteRegister() {
                 <Flag className="w-6 h-6 text-cyan-600" /> Affiliation
               </h2>
               <div className="relative z-[30]">
-                <Select label="Category/Role" name="role" value={formData.role} onChange={handleInputChange} error={errors.role} required light placeholder="Select category/role" options={getRoleOptions()} />
+                {inviteLink?.role ? (
+                  <Input label="Category/Role" value={formData.role} disabled light className="opacity-75 bg-slate-100" />
+                ) : (
+                  <Select label="Category/Role" name="role" value={formData.role} onChange={handleInputChange} error={errors.role} required light placeholder="Select category/role" options={getRoleOptions()} />
+                )}
               </div>
               <div className="relative z-[20]">
-                {(() => {
-                  const selectedCat = eventCategories.find(c => c.name === formData.role);
-                  const catId = selectedCat ? selectedCat.id : formData.role;
-                  const restrictedOrgs = formData.role ? categoryAllowlist[catId] : null;
-                  if (restrictedOrgs && restrictedOrgs.length > 0) {
+                {inviteLink?.club ? (
+                  <Input label="Organization/Club/Academy" value={formData.club} disabled light className="opacity-75 bg-slate-100" />
+                ) : (
+                  (() => {
+                    const selectedCat = eventCategories.find(c => c.name === formData.role);
+                    const catId = selectedCat ? selectedCat.id : formData.role;
+                    const restrictedOrgs = formData.role ? categoryAllowlist[catId] : null;
+                    if (restrictedOrgs && restrictedOrgs.length > 0) {
+                      return (
+                        <SearchableSelect label="Organization/Club/Academy *" value={formData.club}
+                          onChange={e => handleInputChange({ target: { name: "club", value: e.target.value } })}
+                          error={errors.club} required options={restrictedOrgs.map(name => ({ value: name, label: name }))} placeholder="Select Organization" light disabled={restrictedOrgs.length === 1} />
+                      );
+                    }
+                    if (formData.role && (teamRoles.includes(formData.role.toLowerCase()) || formData.role.toLowerCase().includes("athlete") || formData.role.toLowerCase().includes("coach")) && clubs.length > 0) {
+                      return (
+                        <SearchableSelect label="Organization/Club/Academy *" value={formData.club}
+                          onChange={e => handleInputChange({ target: { name: "club", value: e.target.value } })}
+                          error={errors.club} required options={clubs.map(c => { const name = typeof c === "string" ? c : (c?.full || c?.short); return name ? { value: name, label: name } : null; }).filter(Boolean)} placeholder="Select organization" light />
+                      );
+                    }
                     return (
-                      <SearchableSelect label="Organization/Club/Academy *" value={formData.club}
-                        onChange={e => handleInputChange({ target: { name: "club", value: e.target.value } })}
-                        error={errors.club} required options={restrictedOrgs.map(name => ({ value: name, label: name }))} placeholder="Select Organization" light disabled={restrictedOrgs.length === 1} />
+                      <Input label="Organization/Club/Academy" name="club" value={formData.club} onChange={handleInputChange} error={errors.club} required placeholder="Enter organization, club or academy" light />
                     );
-                  }
-                  if (formData.role && (teamRoles.includes(formData.role.toLowerCase()) || formData.role.toLowerCase().includes("athlete") || formData.role.toLowerCase().includes("coach")) && clubs.length > 0) {
-                    return (
-                      <SearchableSelect label="Organization/Club/Academy *" value={formData.club}
-                        onChange={e => handleInputChange({ target: { name: "club", value: e.target.value } })}
-                        error={errors.club} required options={clubs.map(c => { const name = typeof c === "string" ? c : (c?.full || c?.short); return name ? { value: name, label: name } : null; }).filter(Boolean)} placeholder="Select organization" light />
-                    );
-                  }
-                  return (
-                    <Input label="Organization/Club/Academy" name="club" value={formData.club} onChange={handleInputChange} error={errors.club} required placeholder="Enter organization, club or academy" light />
-                  );
-                })()}
+                  })()
+                )}
               </div>
               <div className="relative z-[10]">
                 <SearchableSelect label="Nationality" value={formData.nationality}

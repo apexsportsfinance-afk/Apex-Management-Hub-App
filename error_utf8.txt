@@ -1,0 +1,84 @@
+﻿git : remote: error: GH013: 
+Repository rule violations 
+found for refs/heads/update-ti
+cket-email-png.        
+At line:1 char:1
++ git push origin 
+update-ticket-email-png 2> 
+git_error.txt
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: (remote: e  
+  rror: ...il-png.        :   
+ String) [], RemoteExcepti    
+on
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 
+remote: 
+remote: - GITHUB PUSH 
+PROTECTION        
+remote:   ΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇ
+öΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇ
+öΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇ
+öΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇ
+öΓÇöΓÇöΓÇöΓÇö        
+remote:     Resolve the 
+following violations before 
+pushing again        
+remote: 
+remote:     - Push cannot 
+contain secrets        
+remote: 
+remote:             
+remote:      (?) Learn how to 
+resolve a blocked push        
+remote:      https://docs.gith
+ub.com/code-security/secret-sc
+anning/working-with-secret-sca
+nning-and-push-protection/work
+ing-with-push-protection-from-
+the-command-line#resolving-a-b
+locked-push        
+remote:             
+remote:             
+remote:       ΓÇöΓÇö Stripe 
+API Key ΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓ
+ÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓ
+ÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓ
+ÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇö    
+    
+remote:        locations:     
+   
+remote:          - commit: 78f
+4766bc5b55f60ac55df15a8507e184
+06e724d        
+remote:            path: 
+.env:2        
+remote:             
+remote:        (?) To push, 
+remove secret from commit(s) 
+or follow this URL to allow 
+the secret.        
+remote:        https://github.
+com/apexsportsfinance-afk/Apex
+accreditpro.com/security/secre
+t-scanning/unblock-secret/3BOQ
+vVcsumomCJZDsjUfSyNISyG       
+ 
+remote:             
+remote: 
+remote: 
+To https://github.com/apexspor
+tsfinance-afk/Apexaccreditpro.
+com.git
+ ! [remote rejected] 
+update-ticket-email-png -> 
+update-ticket-email-png (push 
+declined due to repository 
+rule violations)
+error: failed to push some 
+refs to 'https://github.com/ap
+exsportsfinance-afk/Apexaccred
+itpro.com.git'

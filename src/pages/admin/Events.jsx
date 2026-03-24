@@ -51,7 +51,8 @@ import AttendanceSheet from "../../components/attendance/AttendanceSheet";
 import AttendanceStats from "../../components/accreditation/AttendanceStats";
 import AttendanceBadge from "../../components/accreditation/AttendanceBadge";
 import ExportModal from "../../components/ui/ExportModal";
-import { getInviteLinks, createInviteLink, toggleInviteLink, deleteInviteLink, getLinkStatus } from "../../lib/inviteLinksApi";
+import { getInviteLinks, createInviteLink, updateInviteLink, toggleInviteLink, deleteInviteLink, getLinkStatus } from "../../lib/inviteLinksApi";
+import MultiSearchableSelect from "../../components/ui/MultiSearchableSelect";
 const DOCUMENT_OPTIONS = [
   { id: "picture", label: "Picture" },
   { id: "passport", label: "Passport" },
@@ -2315,9 +2316,40 @@ function InviteLinksView({ event }) {
   const [showCreate, setShowCreate] = React.useState(false);
   const [creating, setCreating] = React.useState(false);
   const [copiedId, setCopiedId] = React.useState(null);
-  const [form, setForm] = React.useState({
-    label: "", mode: "multi", maxUses: "", expiresIn: "48h", customExpiry: ""
-  });
+  const [editingLinkId, setEditingLinkId] = React.useState(null);
+  const [availableClubs, setAvailableClubs] = React.useState([]);
+
+  const defaultForm = {
+    label: "", mode: "multi", maxUses: "", expiresIn: "48h", customExpiry: "",
+    role: "", club: []
+  };
+  const [form, setForm] = React.useState(defaultForm);
+
+  const roleOptions = [
+    { value: "participant", label: "Participant" },
+    { value: "coach", label: "Coach" },
+    { value: "official", label: "Official" },
+    { value: "vip", label: "VIP" },
+    { value: "media", label: "Media" },
+    { value: "crew", label: "Crew / Staff" },
+    { value: "sponsor", label: "Sponsor" },
+    { value: "spectator", label: "Spectator" }
+  ];
+
+  React.useEffect(() => {
+    const fetchClubs = async () => {
+      try {
+        const clubsData = await CategoriesAPI.getActive();
+        const uniqueClubs = Array.from(new Set(clubsData.map(c => c.clubName).filter(Boolean))).sort();
+        setAvailableClubs(uniqueClubs);
+      } catch (err) { }
+    };
+    fetchClubs();
+  }, []);
+
+  const clubs = React.useMemo(() => {
+    return availableClubs.map(c => ({ value: c, label: c }));
+  }, [availableClubs]);
 
   const loadLinks = React.useCallback(async () => {
     setLoading(true);
@@ -2339,23 +2371,48 @@ function InviteLinksView({ event }) {
     return d.toISOString();
   };
 
-  const handleCreate = async () => {
+  const handleCreateOrUpdate = async () => {
     if (!form.label.trim()) { toast.error("Label is required"); return; }
     setCreating(true);
     try {
-      await createInviteLink(event.id, {
+      const payload = {
         label: form.label,
         mode: form.mode,
         maxUses: form.mode === "single" ? 1 : (form.maxUses ? parseInt(form.maxUses) : null),
-        expiresAt: getExpiryDate()
-      });
-      toast.success("Invite link created!");
+        expiresAt: getExpiryDate(),
+        role: form.role || null,
+        club: form.club && form.club.length > 0 ? form.club : null
+      };
+
+      if (editingLinkId) {
+        await updateInviteLink(event.id, editingLinkId, payload);
+        toast.success("Invite link updated!");
+      } else {
+        await createInviteLink(event.id, payload);
+        toast.success("Invite link created!");
+      }
+
       setShowCreate(false);
-      setForm({ label: "", mode: "multi", maxUses: "", expiresIn: "48h", customExpiry: "" });
+      setEditingLinkId(null);
+      setForm(defaultForm);
       loadLinks();
     } catch (err) {
-      toast.error("Failed to create link: " + (err.message || ""));
+      toast.error(`Failed to ${editingLinkId ? "update" : "create"} link: ` + (err.message || ""));
     } finally { setCreating(false); }
+  };
+
+  const openEdit = (link) => {
+    setEditingLinkId(link.id);
+    setForm({
+      label: link.label || "",
+      mode: link.mode || "multi",
+      maxUses: link.maxUses ? link.maxUses.toString() : "",
+      expiresIn: link.expiresAt ? "custom" : "never",
+      customExpiry: link.expiresAt ? new Date(link.expiresAt).toISOString().slice(0, 16) : "",
+      role: link.role || "",
+      club: link.club ? (Array.isArray(link.club) ? link.club : [link.club]) : []
+    });
+    setShowCreate(true);
   };
 
   const handleToggle = async (link) => {
@@ -2414,14 +2471,18 @@ function InviteLinksView({ event }) {
           <h3 className="text-xl font-bold text-white">Private Invite Links</h3>
           <p className="text-sm text-slate-400 mt-1">Generate secret registration links for specific people while main registration stays closed.</p>
         </div>
-        <Button icon={Plus} onClick={() => setShowCreate(true)}>Create Link</Button>
+        <Button icon={Plus} onClick={() => {
+          setEditingLinkId(null);
+          setForm(defaultForm);
+          setShowCreate(true);
+        }}>Create Link</Button>
       </div>
 
       {/* Create Form */}
       {showCreate && (
         <Card className="border-violet-500/30 bg-violet-500/5">
           <CardContent className="p-6 space-y-4">
-            <h4 className="text-lg font-bold text-white">New Invite Link</h4>
+            <h4 className="text-lg font-bold text-white">{editingLinkId ? "Edit Invite Link" : "New Invite Link"}</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1">Label <span className="text-red-400">*</span></label>
@@ -2457,6 +2518,34 @@ function InviteLinksView({ event }) {
                   className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500" />
               </div>
             )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Restrict to Role <span className="text-slate-500 text-xs">(optional)</span>
+                </label>
+                <select
+                  value={form.role}
+                  onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
+                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500"
+                >
+                  <option value="">Any Role</option>
+                  {roleOptions.map(r => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Restrict to Clubs <span className="text-slate-500 text-xs">(optional)</span>
+                </label>
+                <MultiSearchableSelect
+                  options={clubs}
+                  value={form.club}
+                  onChange={val => setForm(p => ({ ...p, club: val }))}
+                  placeholder="Select organizations..."
+                />
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Usage Mode</label>
               <div className="flex gap-3">
@@ -2486,8 +2575,14 @@ function InviteLinksView({ event }) {
               </div>
             )}
             <div className="flex gap-3 pt-2">
-              <Button onClick={handleCreate} loading={creating} disabled={creating}>Generate Link</Button>
-              <Button variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
+              <Button onClick={handleCreateOrUpdate} loading={creating} disabled={creating}>
+                {editingLinkId ? "Save Changes" : "Generate Link"}
+              </Button>
+              <Button variant="ghost" onClick={() => {
+                setShowCreate(false);
+                setEditingLinkId(null);
+                setForm(defaultForm);
+              }}>Cancel</Button>
             </div>
           </CardContent>
         </Card>
@@ -2523,6 +2618,11 @@ function InviteLinksView({ event }) {
                         <span className={`text-xs px-2 py-0.5 rounded-full border ${link.mode === "single" ? "border-blue-500/30 bg-blue-500/10 text-blue-300" : "border-cyan-500/30 bg-cyan-500/10 text-cyan-300"}`}>
                           {link.mode === "single" ? "Single-Use" : "Multi-Use"}
                         </span>
+                        {(link.role || (link.club && link.club.length > 0)) && (
+                           <span className="text-[10px] uppercase font-bold text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded border border-violet-500/20">
+                             Restricted Link
+                           </span>
+                        )}
                       </div>
                       <code className="text-xs text-slate-500 truncate block max-w-md">{url}</code>
                       <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
@@ -2531,6 +2631,17 @@ function InviteLinksView({ event }) {
                           <span>Expires: {new Date(link.expiresAt).toLocaleString()}</span>
                         )}
                         {!link.expiresAt && <span>Never expires</span>}
+                        {link.role && <span>• Role: <span className="text-white">{link.role}</span></span>}
+                        {link.club && link.club.length > 0 && (() => {
+                          const clubsArray = Array.isArray(link.club) ? link.club : [link.club];
+                          return (
+                            <span title={clubsArray.join(", ")}>
+                              • Clubs: <span className="text-white truncate max-w-[150px] inline-block align-bottom">
+                                {clubsArray.length === 1 ? clubsArray[0] : `${clubsArray.length} clubs selected`}
+                              </span>
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -2547,6 +2658,12 @@ function InviteLinksView({ event }) {
                         title="Open link">
                         <ExternalLink className="w-3.5 h-3.5" />
                       </a>
+                      <button
+                        onClick={() => openEdit(link)}
+                        className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
+                        title="Edit link">
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={() => handleToggle(link)}
                         className={`px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${link.isActive ? "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20" : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"}`}

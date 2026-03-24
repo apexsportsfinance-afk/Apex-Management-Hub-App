@@ -13,6 +13,8 @@ const Register = lazy(() => import("./pages/public/Register"));
 const InviteRegister = lazy(() => import("./pages/public/InviteRegister"));
 const VerifyAccreditation = lazy(() => import("./pages/public/VerifyAccreditation"));
 const ScannerPage = lazy(() => import("./pages/public/Scanner"));
+const SpectatorPortal = lazy(() => import("./pages/public/SpectatorPortal"));
+const SpectatorTicket = lazy(() => import("./pages/public/SpectatorTicket"));
 
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
 const Events = lazy(() => import("./pages/admin/Events"));
@@ -23,6 +25,7 @@ const Settings = lazy(() => import("./pages/admin/Settings"));
 const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
 const QRSystem = lazy(() => import("./pages/admin/QRSystem"));
 const BroadcastHistory = lazy(() => import("./pages/admin/BroadcastHistory"));
+const Ticketing = lazy(() => import("./pages/admin/Ticketing"));
 
 const PageLoader = () => (
   <div id="app_pageloader" className="flex items-center justify-center min-h-screen bg-swim-deep">
@@ -49,11 +52,14 @@ export default function App() {
               <Route path="/verify/:id" element={<VerifyAccreditation />} />
               <Route path="/accreditation/:id" element={<VerifyAccreditation />} />
               <Route path="/scanner" element={<ScannerPage />} />
+              <Route path="/tickets/:slug" element={<SpectatorPortal />} />
+              <Route path="/view-ticket/:id" element={<SpectatorTicket />} />
 
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<Navigate to="/admin/dashboard" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="events/:id?/:subpage?" element={<Events />} />
+                <Route path="ticketing" element={<Ticketing />} />
                 <Route path="accreditations" element={<Accreditations />} />
                 <Route path="zones" element={<Zones />} />
                 <Route path="qr-system" element={<QRSystem />} />

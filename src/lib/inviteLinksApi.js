@@ -43,7 +43,7 @@ async function saveInviteLinks(eventId, links) {
 /**
  * Create a new invite link
  */
-export async function createInviteLink(eventId, { label, mode, maxUses, expiresAt }) {
+export async function createInviteLink(eventId, { label, mode, maxUses, expiresAt, role, club }) {
   const links = await getInviteLinks(eventId);
   const newLink = {
     id: `il_${Date.now()}`,
@@ -53,6 +53,8 @@ export async function createInviteLink(eventId, { label, mode, maxUses, expiresA
     maxUses: mode === "single" ? 1 : (maxUses ? parseInt(maxUses) : null),
     useCount: 0,
     expiresAt: expiresAt || null,
+    role: role || null,
+    club: club || null,
     isActive: true,
     createdAt: new Date().toISOString(),
     eventId
@@ -80,6 +82,27 @@ export async function deleteInviteLink(eventId, linkId) {
   const updated = links.filter(l => l.id !== linkId);
   await saveInviteLinks(eventId, updated);
   return updated;
+}
+
+/**
+ * Update an existing invite link
+ */
+export async function updateInviteLink(eventId, linkId, updates) {
+  const links = await getInviteLinks(eventId);
+  const updated = links.map(l => {
+    if (l.id !== linkId) return l;
+    return {
+      ...l,
+      label: updates.label !== undefined ? updates.label : l.label,
+      expiresAt: updates.expiresAt !== undefined ? updates.expiresAt : l.expiresAt,
+      maxUses: updates.maxUses !== undefined ? updates.maxUses : l.maxUses,
+      mode: updates.mode !== undefined ? updates.mode : l.mode,
+      role: updates.role !== undefined ? updates.role : l.role,
+      club: updates.club !== undefined ? updates.club : l.club
+    };
+  });
+  await saveInviteLinks(eventId, updated);
+  return updated.find(l => l.id === linkId);
 }
 
 /**

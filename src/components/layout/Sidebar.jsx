@@ -12,14 +12,16 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  History,
-  Radio
+  Radio,
+  Ticket,
+  History
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
 const navItems = [
   { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/admin/events", icon: Calendar, label: "Events" },
+  { to: "/admin/ticketing", icon: Ticket, label: "Spectator Portal" },
   { to: "/admin/accreditations", icon: ClipboardList, label: "Accreditations" },
   { to: "/admin/zones", icon: Map, label: "Zones" },
   { to: "/admin/qr-system", icon: QrCode, label: "QR System" },

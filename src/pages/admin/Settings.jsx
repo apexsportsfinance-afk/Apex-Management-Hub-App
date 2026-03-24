@@ -36,7 +36,8 @@ export default function Settings() {
   const [templates, setTemplates] = useState({
     approved: { subject: "", body: "" },
     rejected: { subject: "", body: "" },
-    custom: { subject: "", body: "" }
+    custom: { subject: "", body: "" },
+    ticket_delivery: { subject: "", body: "" }
   });
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
@@ -175,6 +176,10 @@ export default function Settings() {
       custom: {
         subject: "Your Accreditation - {eventName}",
         body: "Dear {name},\n\nPlease find your accreditation details attached.\n\nEvent: {eventName}\nRole: {role}\nBadge: {badge}\n\nPlease present this at the venue for badge collection.\n\nBest regards,\nApex Sports Accreditations"
+      },
+      ticket_delivery: {
+        subject: "Booking Confirmation - {eventName}",
+        body: "Dear {name},\n\nThank you for booking your ticket(s) with us. We are thrilled to welcome you to {eventName}!\n\nAttached to this email, you will find your official e-ticket(s). Please review your booking details carefully:\n\nEvent: {eventName}\nTotal Tickets: {ticketCount} Person(s)\nAmount Paid: {amountPaid} AED\nPayment Method: {paymentMethod}\nReference ID: {qrCodeId}\n\nPlease keep this email safe and present the attached QR code at the event entrance for scanning. To ensure a smooth entry, please have your ID ready as it may be required for verification.\n\nIf you have any questions or require any assistance, simply reply directly to this email.\n\nWe hope you thoroughly enjoy the event!\n\nWarm regards,\nThe Apex Sports Team"
       }
     };
     setTemplates((prev) => ({ ...prev, [templateTab]: defaults[templateTab] }));
@@ -502,22 +507,25 @@ export default function Settings() {
         </CardHeader>
         <CardContent>
           <div className="space-y-5">
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {[
                 { key: "approved", label: "Approval Email", color: "emerald" },
                 { key: "rejected", label: "Rejection Email", color: "red" },
-                { key: "custom", label: "Compose Default", color: "cyan" }
+                { key: "custom", label: "Compose Default", color: "cyan" },
+                { key: "ticket_delivery", label: "Ticket Delivery", color: "amber" }
               ].map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setTemplateTab(tab.key)}
-                  className={`px-4 py-2.5 rounded-lg text-lg font-medium transition-all ${
+                  className={`px-4 py-2.5 mb-2 rounded-lg text-lg font-medium transition-all ${
                     templateTab === tab.key
                       ? tab.color === "emerald"
                         ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                         : tab.color === "red"
                         ? "bg-red-500/20 text-red-300 border border-red-500/40"
-                        : "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                        : tab.color === "cyan"
+                        ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                        : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
                       : "bg-slate-800/50 text-slate-400 border border-slate-700/50 hover:text-white"
                   }`}
                 >
@@ -565,7 +573,7 @@ export default function Settings() {
                 <div className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/50">
                   <p className="text-lg text-slate-300 font-medium mb-2">Available Placeholders:</p>
                   <div className="flex flex-wrap gap-2">
-                    {["{name}", "{firstName}", "{lastName}", "{eventName}", "{role}", "{badge}", "{zones}", "{email}"].map((ph) => (
+                    {["{name}", "{firstName}", "{lastName}", "{eventName}", "{role}", "{badge}", "{zones}", "{email}", "{ticketCount}", "{amountPaid}", "{paymentMethod}", "{qrCodeId}"].map((ph) => (
                       <span
                         key={ph}
                         className="px-3 py-1.5 rounded-md bg-violet-500/10 border border-violet-500/20 text-lg text-violet-300 font-mono cursor-pointer hover:bg-violet-500/20 transition-colors"

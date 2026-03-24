@@ -192,7 +192,10 @@ export const CardInner = memo(function CardInner({ accreditation, event, zones =
   const finalColor = resolvedColor || roleData.hex;
 
   const zoneCodes = accreditation?.zoneCode?.split(",").map(z => z.trim()).filter(Boolean) || [];
-  const countryData = COUNTRIES.find(c => c.code === accreditation?.nationality);
+  const countryData = COUNTRIES.find(c => 
+    c.code?.toUpperCase() === accreditation?.nationality?.toUpperCase() || 
+    c.name?.toLowerCase() === accreditation?.nationality?.toLowerCase()
+  );
   const countryName = getCountryName(accreditation?.nationality);
   const isAthlete = accreditation?.role?.toLowerCase() === "athlete";
   const age = isAthlete && accreditation?.dateOfBirth && event?.ageCalculationYear
