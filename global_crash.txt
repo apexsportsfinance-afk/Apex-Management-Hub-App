@@ -1,0 +1,6 @@
+Error: input source must be valid Stream or Buffer instance
+    at Archiver.append (C:\Users\Administrator\OneDrive\Desktop\Basit Ali Shah\Accreditation Platform\Apexaccreditpro.com-1d88fa4b194826d20202ef711d8cb8fef6ffd66b\node_modules\archiver\lib\core.js:583:24)
+    at EnterpriseBackgroundExporter._generateCardPDF (file:///C:/Users/Administrator/OneDrive/Desktop/Basit%20Ali%20Shah/Accreditation%20Platform/Apexaccreditpro.com-1d88fa4b194826d20202ef711d8cb8fef6ffd66b/server/backgroundExportService.js:156:15)
+    at async Promise.all (index 1)
+    at async EnterpriseBackgroundExporter.processBulkExportJob (file:///C:/Users/Administrator/OneDrive/Desktop/Basit%20Ali%20Shah/Accreditation%20Platform/Apexaccreditpro.com-1d88fa4b194826d20202ef711d8cb8fef6ffd66b/server/backgroundExportService.js:60:9)
+    at async testExporter ([eval]:15:3)

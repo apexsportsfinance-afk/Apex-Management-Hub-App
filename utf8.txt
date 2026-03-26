@@ -1,0 +1,28 @@
+﻿git : remote: 
+At line:1 char:1
++ git push origin 
+update-ticket-email-png 2> 
+out.txt
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: (remote: :  
+  String) [], RemoteExcepti   
+ on
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 
+remote: Create a pull request 
+for 'update-ticket-email-png' 
+on GitHub by visiting:        
+remote:      https://github.co
+m/apexsportsfinance-afk/Apexac
+creditpro.com/pull/new/update-
+ticket-email-png        
+remote: 
+To https://github.com/apexspor
+tsfinance-afk/Apexaccreditpro.
+com.git
+ * [new branch]      
+update-ticket-email-png -> 
+update-ticket-email-png

@@ -105,6 +105,11 @@ export default function VerifyAccreditation() {
     setLoading(true);
     try {
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      
+      // High-priority bypass for server-side PDF generation
+      const urlParams = new URLSearchParams(window.location.search);
+      const isServerCapture = urlParams.get('skipAuth') === 'true' || window.location.pathname.includes('/print-secure/');
+
       let accData, accErr;
 
       const fetchAccreditation = async () => {
@@ -160,7 +165,12 @@ export default function VerifyAccreditation() {
       console.error("Error loading accreditation data:", err);
       setError(err.message || "Accreditation not found");
     } finally {
-      setLoading(false);
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('skipAuth') === 'true' || window.location.pathname.includes('/print-secure/')) {
+        setLoading(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
@@ -318,12 +328,28 @@ export default function VerifyAccreditation() {
     visible: { opacity: 1, y: 0 }
   };
 
-  if (loading) return <ScanSkeleton />;
-  if (error || !data) return <ScanError error={error} />;
+  const urlParams = new URLSearchParams(window.location.search);
+  const isServerCapture = urlParams.get('skipAuth') === 'true' || window.location.pathname.includes('/print-secure/');
+
+  if (loading && !isServerCapture) return <ScanSkeleton />;
+  if (error) return <ScanError error={error} />;
+  
+  // If we are waiting for data but in server mode, show a small loader to prevent blank capture
+  if (!data && isServerCapture) return <div className="p-20 text-blue-900 font-bold">Initializing Engine...</div>;
+  if (!data) return <ScanSkeleton />;
 
 
   return (
     <div id="verify-accreditation-page" className="min-h-screen bg-[#050b18] text-slate-200 font-inter selection:bg-cyan-500/30">
+      {/* Server Capture Style Injection */}
+      {window.location.search.includes('skipAuth=true') && (
+        <style>{`
+          #verify-accreditation-page { background: white !important; min-height: 0 !important; padding: 0 !important; }
+          .min-h-screen { min-height: 0 !important; }
+          .fixed, .absolute.top-[-10%] { display: none !important; }
+          body, html { background: white !important; overflow: visible !important; }
+        `}</style>
+      )}
       {/* Messages Modal */}
       <AnimatePresence>
         {showMessagesModal && (

@@ -45,6 +45,9 @@ export default function App() {
           <LayoutProvider>
             <Suspense fallback={<PageLoader />}>
             <Routes>
+              {/* Added high-res export route while keeping original structure intact */}
+              <Route path="/print-secure/:id" element={<VerifyAccreditation />} />
+              
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register/:slug" element={<Register />} />

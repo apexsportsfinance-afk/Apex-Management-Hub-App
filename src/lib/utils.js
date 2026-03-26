@@ -1,4 +1,5 @@
 import { format, differenceInYears, differenceInDays, differenceInHours } from "date-fns";
+import { saveAs } from "file-saver";
 
 export const cn = (...classes) => {
   return classes.filter(Boolean).join(" ");
@@ -378,18 +379,13 @@ export const downloadPdfBlob = (blob, fileName) => {
     }
 
     try {
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-
-      resolve(true);
+      const reader = new FileReader();
+      reader.onload = () => {
+        forceDownloadViaServer(reader.result, fileName);
+        resolve(true);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
     } catch (error) {
       console.error("Download error:", error);
       reject(new Error("Failed to download PDF"));
@@ -427,6 +423,34 @@ export const openPdfInNewTab = (blob) => {
   });
 };
 
+export const forceDownloadViaServer = (base64Data, fileName) => {
+  // Strip off the data URL prefix if it exists
+  const cleanBase64 = base64Data.replace(/^data:.*?;base64,/, "");
+  
+  const form = document.createElement("form");
+  form.method = "POST";
+  // The vite proxy handles the /api prefix correctly across networks
+  form.action = "/api/download-file";
+
+  const nameInput = document.createElement("input");
+  nameInput.type = "hidden";
+  nameInput.name = "filename";
+  nameInput.value = fileName;
+  form.appendChild(nameInput);
+
+  const dataInput = document.createElement("input");
+  dataInput.type = "hidden";
+  dataInput.name = "base64";
+  dataInput.value = cleanBase64;
+  form.appendChild(dataInput);
+
+  document.body.appendChild(form);
+  form.submit();
+  setTimeout(() => {
+    if (form.parentNode) document.body.removeChild(form);
+  }, 1000);
+};
+
 export const downloadPdfAsDataUrl = async (blob, fileName) => {
   if (!blob || blob.size === 0) {
     throw new Error("Invalid PDF blob - empty or missing");
@@ -435,19 +459,8 @@ export const downloadPdfAsDataUrl = async (blob, fileName) => {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const dataUrl = reader.result;
-        const link = document.createElement("a");
-        link.href = dataUrl;
-        link.download = fileName;
-        link.style.cssText = "position:fixed;left:0;top:0;opacity:0;";
-        document.body.appendChild(link);
-        link.click();
-        setTimeout(() => {
-          if (link.parentNode) {
-            document.body.removeChild(link);
-          }
-          resolve(true);
-        }, 500);
+        forceDownloadViaServer(reader.result, fileName);
+        resolve(true);
       } catch (error) {
         reject(error);
       }

@@ -1,11 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200;300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  .glass {
+    @apply bg-slate-900/40 backdrop-blur-xl border border-white/5 shadow-2xl;
+  }
+}
+
 :root {
-  --font-sans: 'Nunito', sans-serif;
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Manrope', sans-serif;
   --space-base: 0.5rem;
 }
 
@@ -19,11 +26,16 @@ html {
 
 body {
   font-family: var(--font-sans);
-  font-weight: 200;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #0a0f1e;
-  color: white;
+  background: #0f172a;
+  color: #f8fafc;
+  letter-spacing: -0.015em;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  letter-spacing: -0.025em;
 }
 
 button, .card, a, input, select {

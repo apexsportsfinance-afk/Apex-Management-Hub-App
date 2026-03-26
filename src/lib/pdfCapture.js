@@ -1,5 +1,6 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import { forceDownloadViaServer } from "./utils";
 
 export const PDF_SIZES = {
   a4:   { width: 210, height: 297, label: "A4 (210x297 mm)", dpi: 72 },
@@ -105,7 +106,8 @@ const captureElement = async (elementId, scale = 3) => {
 
   export const downloadCapturedPDF = async (frontId, backId, fileName, sizeKey = "card") => {
   try {
-    const { canvas: frontCanvas, width, height } = await captureElement(frontId, 3);
+    // 450 DPI / 72 base DPI = 6.25 (Maximum Resolution)
+    const { canvas: frontCanvas, width, height } = await captureElement(frontId, 6.25);
     const pdfWidth = width;
     const pdfHeight = height;
 
@@ -127,7 +129,7 @@ const captureElement = async (elementId, scale = 3) => {
     );
 
     if (backId) {
-      const { canvas: backCanvas, width: bw, height: bh } = await captureElement(backId, 3);
+      const { canvas: backCanvas, width: bw, height: bh } = await captureElement(backId, 6.25);
       pdf.addPage([bw, bh]);
       pdf.addImage(
         backCanvas.toDataURL("image/png", 1.0),
@@ -138,7 +140,7 @@ const captureElement = async (elementId, scale = 3) => {
       );
     }
 
-    pdf.save(fileName);
+    forceDownloadViaServer(pdf.output("datauristring"), fileName);
   } catch (error) {
     console.error("PDF Error:", error);
     throw new Error(`Failed to generate PDF: ${error.message}`);
@@ -146,7 +148,7 @@ const captureElement = async (elementId, scale = 3) => {
 };
 
 export const openCapturedPDFInTab = async (frontId, backId, sizeKey = "card") => {
-  const { canvas, width, height } = await captureElement(frontId, 3);
+  const { canvas, width, height } = await captureElement(frontId, 6.25);
 
   const pdf = new jsPDF({
     orientation: width > height ? "l" : "p",
@@ -158,7 +160,7 @@ export const openCapturedPDFInTab = async (frontId, backId, sizeKey = "card") =>
   pdf.addImage(canvas.toDataURL("image/png", 1.0), "PNG", 0, 0, width, height, undefined, "MEDIUM");
 
   if (backId) {
-    const { canvas: bc, width: bw, height: bh } = await captureElement(backId, 3);
+    const { canvas: bc, width: bw, height: bh } = await captureElement(backId, 5.55);
     pdf.addPage([bw, bh]);
     pdf.addImage(bc.toDataURL("image/png", 1.0), "PNG", 0, 0, bw, bh, undefined, "MEDIUM");
   }
@@ -167,7 +169,7 @@ export const openCapturedPDFInTab = async (frontId, backId, sizeKey = "card") =>
 };
 
 export const getCapturedPDFBlob = async (frontId, backId, sizeKey = "card") => {
-  const { canvas, width, height } = await captureElement(frontId, 3);
+  const { canvas, width, height } = await captureElement(frontId, 6.25);
 
   const pdf = new jsPDF({
     orientation: width > height ? "l" : "p",
@@ -179,7 +181,7 @@ export const getCapturedPDFBlob = async (frontId, backId, sizeKey = "card") => {
   pdf.addImage(canvas.toDataURL("image/png", 1.0), "PNG", 0, 0, width, height, undefined, "MEDIUM");
 
   if (backId) {
-    const { canvas: bc, width: bw, height: bh } = await captureElement(backId, 3);
+    const { canvas: bc, width: bw, height: bh } = await captureElement(backId, 6.25);
     pdf.addPage([bw, bh]);
     pdf.addImage(bc.toDataURL("image/png", 1.0), "PNG", 0, 0, bw, bh, undefined, "MEDIUM");
   }

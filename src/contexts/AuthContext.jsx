@@ -126,7 +126,13 @@ export const AuthProvider = ({ children }) => {
       } catch (error) {
         console.error("Auth initialization error:", error);
       } finally {
-        if (mountedRef.current) setLoading(false);
+        if (mountedRef.current) {
+          if (window.location.pathname.includes('/print-secure/')) {
+            setLoading(false);
+          } else {
+            setLoading(false);
+          }
+        }
       }
     };
 

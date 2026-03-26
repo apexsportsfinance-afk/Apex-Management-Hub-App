@@ -1,5 +1,6 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import { forceDownloadViaServer } from "../../lib/utils";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { CardInner } from "./AccreditationCardPreview";
@@ -117,7 +118,7 @@ const inlineAllImages = async (container) => {
  * The QR is set via React state (qrDataUrl) so we poll for
  * the img[data-qr-code] to have a valid data: src.
  */
-const waitForQR = (container, timeoutMs = 8000) =>
+const waitForQR = (container, timeoutMs = 3000) =>  // Reduced from 8000ms
   new Promise((resolve) => {
     const start = Date.now();
     const check = () => {
@@ -178,7 +179,7 @@ const renderOffscreenCard = (accreditation, event, zones) =>
     );
 
     let attempts = 0;
-    const MAX = 80;
+    const MAX = 40; // Reduced from 80 — 4 seconds max wait
 
     const poll = async () => {
       attempts++;
@@ -194,8 +195,8 @@ const renderOffscreenCard = (accreditation, event, zones) =>
         return setTimeout(poll, 100);
       }
 
-      // Wait specifically for QR code to be generated before capturing
-      await waitForQR(container, 8000);
+      // Wait for QR code — shorter timeout for bulk speed
+      await waitForQR(container, 2500);
 
       await inlineAllImages(container);
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -428,11 +429,14 @@ export const bulkDownloadPDFs = async (
 ) => {
   if (!accreditations || accreditations.length === 0) return;
 
-  const scale = 5;
+  // Scale 6.25 precisely matches 450 DPI (450 / 72 base pixels = 6.25)
+  const scale = 6.25;
 
   try {
-    const JSZip = (await import("jszip")).default;
-    const zip = new JSZip();
+    // Use require-style interop that works with Vite's CJS bundling of jszip
+    const JSZipModule = await import("jszip");
+    const JSZipClass = JSZipModule.default ?? JSZipModule;
+    const zip = new JSZipClass();
     let completed = 0;
     let failed = 0;
 
@@ -457,15 +461,12 @@ export const bulkDownloadPDFs = async (
       }
     }
 
-    const zipBlob = await zip.generateAsync({ type: "blob" });
-    const url = URL.createObjectURL(zipBlob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `accreditations-${event?.name || "cards"}-${Date.now()}.zip`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    const zipBase64 = await zip.generateAsync({ type: "base64", compression: "DEFLATE", compressionOptions: { level: 6 } });
+    const safeEventName = (event?.name || "cards").replace(/[^a-zA-Z0-9\-_. ]/g, "").trim().replace(/\s+/g, "_");
+    const fileName = `Badges_${safeEventName}_${Date.now()}.zip`;
+    
+    // Force native download via the server
+    forceDownloadViaServer(zipBase64, fileName);
 
     return { completed, failed };
   } catch (err) {

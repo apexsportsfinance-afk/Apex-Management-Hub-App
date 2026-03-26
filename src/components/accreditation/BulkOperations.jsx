@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Download, FileSpreadsheet, FileText, Edit, CheckCircle, Mail, Image as ImageIcon } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Edit, CheckCircle, Mail, Image as ImageIcon, Trash2 } from "lucide-react";
+import { supabase } from "../../lib/supabase";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import Select from "../ui/Select";
@@ -8,6 +9,7 @@ import { exportToExcel, exportTableToPDF } from "./ExportUtils";
 import { bulkDownloadPDFs } from "./cardExport";
 import ComposeEmailModal from "./ComposeEmailModal";
 import { bulkDownloadPhotos } from "../../lib/imageDownload";
+import BulkPdfDownloader from "./BulkPdfDownloader";
 
 export default function BulkOperations({ 
   selectedRows, 
@@ -26,8 +28,40 @@ export default function BulkOperations({
   const [downloading, setDownloading] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const selectAllFiltered = () => onClearSelection(filteredData.map(r => r.id));
+  const [isPending, startTransition] = React.useTransition();
+
+  const selectAllFiltered = () => {
+    startTransition(() => {
+      onClearSelection(filteredData.map(r => r.id));
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedRows || selectedRows.length === 0) return;
+    const confirmMessage = `WARNING: You are about to PERMANENTLY DELETE ${selectedRows.length} accreditations. This action cannot be undone. Are you absolutely certain?`;
+    if (!window.confirm(confirmMessage)) return;
+
+    setIsDeleting(true);
+    try {
+      // Chunk deletions if massive array
+      for (let i = 0; i < selectedRows.length; i += 100) {
+        const chunk = selectedRows.slice(i, i + 100);
+        const { error } = await supabase.from('accreditations').delete().in('id', chunk);
+        if (error) throw error;
+      }
+      
+      // Successfully deleted — clear selection and gracefully refresh to pull new valid db state
+      onClearSelection([]);
+      window.location.reload();
+    } catch (err) {
+      console.error("Bulk Delete error:", err);
+      alert("Failed to delete records: " + err.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleBulkDownload = async () => {
     if (selectedRows.length === 0) return;
@@ -174,15 +208,13 @@ export default function BulkOperations({
             >
               Bulk Approve
             </Button>
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              onClick={handleBulkDownload} 
-              loading={downloading} 
-              icon={Download}
-            >
-              Download Cards
-            </Button>
+            <BulkPdfDownloader 
+              accreditationIds={selectedRows} 
+              eventName={event?.name || 'Accreditations'}
+              filteredData={filteredData}
+              event={event}
+              zones={zones}
+            />
             <Button
               variant="secondary"
               size="sm"
@@ -191,14 +223,20 @@ export default function BulkOperations({
             >
               Bulk Email
             </Button>
+            <BulkPdfDownloader 
+              accreditationIds={selectedRows} 
+              eventName={event?.name || 'Accreditations'}
+              type="photos"
+              label={`Photos Batch (${selectedRows.length})`}
+            />
             <Button
-              variant="secondary"
+              variant="danger"
               size="sm"
-              onClick={handleBulkDownloadPhotos}
-              loading={downloadingPhotos}
-              icon={ImageIcon}
+              onClick={handleBulkDelete}
+              loading={isDeleting}
+              icon={Trash2}
             >
-              Download Photos
+              Bulk Delete
             </Button>
           </>
         )}

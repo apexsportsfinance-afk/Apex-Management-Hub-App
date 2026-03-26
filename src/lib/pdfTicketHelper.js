@@ -2,16 +2,13 @@
  * Uses html2canvas to render the visually rich SpectatorTicketCard into a PDF.
  */
 
-let jsPDF = null;
 let html2canvas = null;
 let SpectatorTicketCard = null;
 let ReactModule = null;
 let createRoot = null;
 
 async function initLibs() {
-  if (jsPDF && html2canvas && SpectatorTicketCard && ReactModule && createRoot) return;
-  const jspdfModule = await import("jspdf");
-  jsPDF = jspdfModule.jsPDF;
+  if (html2canvas && SpectatorTicketCard && ReactModule && createRoot) return;
   html2canvas = (await import("html2canvas")).default;
   const cardModule = await import("../components/public/SpectatorTicketCard");
   SpectatorTicketCard = cardModule.SpectatorTicketCard;
