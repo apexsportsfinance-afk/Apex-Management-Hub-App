@@ -1,0 +1,211 @@
+// Apex Sports Management Platform
+// Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String   // In a real app, this would be hashed
+  name      String?
+  role      String   @default("coach") // admin, manager, coach, parent
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Parent {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  phone     String?
+  address   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  athletes  Athlete[]
+}
+
+model Athlete {
+  phone     String?
+  parentId  Int?
+  status    String       @default("active") // active, inactive, suspended
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  parent    Parent?      @relation(fields: [parentId], references: [id])
+  bookings  Booking[]
+  payments  Payment[]
+  attendance Attendance[]
+}
+
+model Coach {
+  id             Int            @id @default(autoincrement())
+  name           String
+  email          String?        @unique
+  phone          String?
+  specialty      String?
+  salaryType     String         @default("fixed") // fixed, commission, hybrid
+  baseSalary     Decimal        @default(0) @db.Decimal(10, 2)
+  commissionRate Decimal        @default(0) @db.Decimal(5, 2) // percentage
+  status         String         @default("active") // active, inactive
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  bookings       Booking[]
+  payments       Payment[]
+  attendance     Attendance[]
+  payroll        CoachPayroll[]
+}
+
+model Venue {
+  id        Int          @id @default(autoincrement())
+  name      String
+  location  String?
+  capacity  Int?
+  status    String       @default("active") // active, maintenance, closed
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  bookings  Booking[]
+  payments  Payment[]
+  attendance Attendance[]
+}
+
+model Term {
+  id          Int       @id @default(autoincrement())
+  name        String
+  startDate   DateTime?
+  endDate     DateTime?
+  description String?
+  createdAt   DateTime  @default(now())
+  bookings    Booking[]
+  payments    Payment[]
+}
+
+model Booking {
+  id            String        @id
+  athleteId     Int
+  coachId       Int?
+  venueId       Int
+  termId        Int?
+  startDate     DateTime
+  endDate       DateTime
+  status        String        @default("pending") // paid, pending, overdue, cancelled
+  paymentMethod String?       // cash, card, bank_transfer, online
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  athlete       Athlete       @relation(fields: [athleteId], references: [id])
+  coach         Coach?        @relation(fields: [coachId], references: [id])
+  venue         Venue         @relation(fields: [venueId], references: [id])
+  term          Term?         @relation(fields: [termId], references: [id])
+  payments      Payment[]
+  expiryAlerts  ExpiryAlert[]
+  attendance    Attendance[]
+
+  @@index([startDate, endDate])
+  @@index([status])
+  @@index([athleteId])
+  @@index([coachId])
+  @@index([venueId])
+}
+
+model Attendance {
+  id        Int      @id @default(autoincrement())
+  bookingId String
+  athleteId Int
+  coachId   Int
+  venueId   Int
+  date      DateTime
+  status    String   @default("present") // present, absent, excused
+  notes     String?
+  createdAt DateTime @default(now())
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  athlete   Athlete  @relation(fields: [athleteId], references: [id])
+  coach     Coach    @relation(fields: [coachId], references: [id])
+  venue     Venue    @relation(fields: [venueId], references: [id])
+
+  @@index([date])
+  @@index([coachId])
+  @@index([athleteId])
+}
+
+model CoachPayroll {
+  id             Int      @id @default(autoincrement())
+  coachId        Int
+  month          Int
+  year           Int
+  basePaid       Decimal  @db.Decimal(10, 2)
+  commissionPaid Decimal  @db.Decimal(10, 2)
+  bonus          Decimal  @default(0) @db.Decimal(10, 2)
+  totalPaid      Decimal  @db.Decimal(10, 2)
+  paymentStatus  String   @default("pending") // pending, processing, paid
+  paidAt         DateTime?
+  createdAt      DateTime @default(now())
+  coach          Coach    @relation(fields: [coachId], references: [id])
+
+  @@index([month, year])
+  @@index([coachId])
+}
+
+model InventoryItem {
+  id          Int       @id @default(autoincrement())
+  name        String
+  category    String    // kit, equipment, digital, rental
+  description String?
+  sku         String?   @unique
+  quantity    Int       @default(0)
+  price       Decimal?  @db.Decimal(10, 2)
+  status      String    @default("available")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  transactions InventoryTransaction[]
+}
+
+model InventoryTransaction {
+  id        Int      @id @default(autoincrement())
+  itemId    Int
+  type      String   // in, out, rental, adjustment
+  quantity  Int
+  reference String?  // Booking ID or Order ID
+  notes     String?
+  createdAt DateTime @default(now())
+  item      InventoryItem @relation(fields: [itemId], references: [id])
+}
+
+model Payment {
+  id            Int      @id @default(autoincrement())
+  bookingId     String
+  athleteId     Int
+  coachId       Int?
+  venueId       Int
+  termId        Int?
+  amount        Decimal  @db.Decimal(10, 2)
+  paymentMethod String?
+  paymentDate   DateTime
+  notes         String?
+  createdAt     DateTime @default(now())
+  booking       Booking  @relation(fields: [bookingId], references: [id])
+  athlete       Athlete  @relation(fields: [athleteId], references: [id])
+  coach         Coach?   @relation(fields: [coachId], references: [id])
+  venue         Venue    @relation(fields: [venueId], references: [id])
+  term          Term?    @relation(fields: [termId], references: [id])
+
+  @@index([paymentDate])
+  @@index([bookingId])
+  @@index([venueId])
+  @@index([coachId])
+}
+
+model ExpiryAlert {
+  id            Int      @id @default(autoincrement())
+  bookingId     String
+  daysRemaining Int
+  alertSent     Boolean  @default(false)
+  alertDate     DateTime?
+  createdAt     DateTime @default(now())
+  booking       Booking  @relation(fields: [bookingId], references: [id])
+}
