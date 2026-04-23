@@ -50,6 +50,7 @@ const navItems = [
   { label: "Family CRM",        href: "/crm/family",        icon: Group       },
   { label: "Inventory Hub",      href: "/inventory",         icon: Box         },
   { label: "Athletes",          href: "/athletes",          icon: Users       },
+  { label: "Coaches",           href: "/coaches",           icon: UserCheck   },
   { label: "Venues",            href: "/venues",            icon: Building2   },
 
   { section: "FINANCE & EXPIRE" },
@@ -71,6 +72,7 @@ const navItems = [
   { section: "SETTINGS" },
   { label: "Settings",          href: "/settings",           icon: Settings   },
   { label: "RBAC Setup",        href: "/settings/rbac",      icon: Shield     },
+  { label: "Migration Hub",     href: "/admin/migrate",      icon: RefreshCw  },
 ];
 
 export default function Sidebar() {

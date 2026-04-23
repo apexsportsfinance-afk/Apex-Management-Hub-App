@@ -1,7 +1,9 @@
 "use client";
 
-import { Award, Calendar, Camera, ChevronRight, FileText, Heart, MapPin, MessageSquare, Star, TrendingUp } from "lucide-react";
-import { useState } from "react";
+import { Award, BarChart3, Calendar, Camera, ChevronRight, FileText, Heart, MapPin, MessageSquare, Star, TrendingUp, Zap, Settings } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import BadgeGallery from "@/components/BadgeGallery";
 
 const athleteData = {
   name: "Emma Watson",
@@ -20,8 +22,18 @@ const athleteData = {
   ]
 };
 
-export default function MomentsPortalPage() {
-  const [activeTab, setActiveTab] = useState("feed");
+import { Suspense } from "react";
+
+function MomentsContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(tabParam || "feed");
+
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam.toLowerCase());
+    }
+  }, [tabParam]);
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -64,7 +76,7 @@ export default function MomentsPortalPage() {
 
       {/* Navigation */}
       <div className="flex gap-8 border-b border-slate-800 mb-8 overflow-x-auto no-scrollbar">
-         {['Feed', 'Progress', 'Attendance', 'Billing'].map((tab) => (
+         {['Feed', 'Progress', 'Milestones', 'Competitions', 'Attendance', 'Billing'].map((tab) => (
            <button 
              key={tab}
              onClick={() => setActiveTab(tab.toLowerCase())}
@@ -132,7 +144,55 @@ export default function MomentsPortalPage() {
              </>
            )}
 
-           {activeTab !== 'feed' && (
+           {activeTab === 'competitions' && (
+             <div className="space-y-6">
+               <div className="card bg-slate-900 border-indigo-500/20 p-8 text-center">
+                 < Award size={48} className="text-indigo-400 mx-auto mb-4" />
+                 <h2 className="text-2xl font-black text-white">Active Competitions</h2>
+                 <p className="text-slate-400">Select an event below to register your child.</p>
+               </div>
+               
+               <div className="grid grid-cols-1 gap-4">
+                  {[
+                    { id: 1, title: "Dubai Spring Open 2026", date: "May 15-16", price: "250 AED", status: "Open" },
+                    { id: 2, title: "Academy Invitational", date: "June 02", price: "150 AED", status: "Closing Soon" }
+                  ].map(comp => (
+                    <div key={comp.id} className="card p-6 flex items-center justify-between hover:border-indigo-500/40 transition-all cursor-pointer">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${comp.status === 'Open' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                            {comp.status}
+                          </span>
+                          <span className="text-xs font-bold text-slate-500 uppercase">{comp.date}</span>
+                        </div>
+                        <h4 className="text-lg font-bold text-white">{comp.title}</h4>
+                        <p className="text-xs text-slate-400 mt-1">Registration includes event kit and digital certificate.</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xl font-black text-white mb-2">{comp.price}</div>
+                        <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black rounded-lg transition-colors uppercase tracking-widest">
+                          Register Now
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+               </div>
+             </div>
+           )}
+
+           {activeTab === 'milestones' && (
+             <div className="space-y-6">
+               <div className="flex items-center justify-between">
+                 <h3 className="text-2xl font-black text-white italic tracking-tighter uppercase">Athlete Achievements</h3>
+                 <div className="flex items-center gap-2 text-indigo-400 text-xs font-black uppercase tracking-widest">
+                   <Star size={16} className="fill-current" /> 4 Badges Earned
+                 </div>
+               </div>
+               <BadgeGallery />
+             </div>
+           )}
+
+           {['progress', 'attendance', 'billing'].includes(activeTab) && (
              <div className="card flex flex-col items-center justify-center py-20 text-slate-500 space-y-4">
                 <BarChart3 size={48} className="opacity-10" />
                 <div className="font-bold uppercase tracking-widest text-sm">Detailed {activeTab} coming soon</div>
@@ -177,6 +237,29 @@ export default function MomentsPortalPage() {
               </div>
            </div>
 
+           {/* Progress Package Health */}
+           <div className="card p-6 bg-gradient-to-br from-indigo-600/20 to-transparent border-indigo-500/30">
+              <div className="flex items-center justify-between mb-4">
+                 <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Package Status</h4>
+                 <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded uppercase">In Credit</span>
+              </div>
+              <div className="space-y-4">
+                 <div>
+                    <div className="flex justify-between mb-1">
+                       <span className="text-xs font-bold text-white">Sessions Remaining</span>
+                       <span className="text-xs font-black text-white">8 / 12</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
+                       <div className="h-full bg-indigo-500 rounded-full w-[66%]"></div>
+                    </div>
+                 </div>
+                 <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Renewal Date</div>
+                    <div className="text-[10px] text-white font-black uppercase tracking-tight">May 12, 2026</div>
+                 </div>
+              </div>
+           </div>
+
            {/* Health Compliance */}
            <div className="card p-5 border-l-4 border-emerald-500 bg-emerald-500/5">
               <div className="flex items-center gap-3">
@@ -198,5 +281,13 @@ export default function MomentsPortalPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function MomentsPortalPage() {
+  return (
+    <Suspense fallback={<div className="p-20 text-center text-slate-500 uppercase tracking-widest font-black">Loading Portal Experience...</div>}>
+      <MomentsContent />
+    </Suspense>
   );
 }

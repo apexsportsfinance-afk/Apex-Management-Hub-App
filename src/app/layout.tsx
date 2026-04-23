@@ -19,13 +19,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <FilterProvider>
-          <div className="app-layout">
-            <Sidebar />
-            <div className="main-wrapper">
-              <Topbar />
-              <main className="page-content">{children}</main>
-            </div>
-          </div>
+          {children}
         </FilterProvider>
       </body>
     </html>

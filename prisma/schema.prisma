@@ -37,10 +37,26 @@ model Athlete {
   status    String       @default("active") // active, inactive, suspended
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
-  parent    Parent?      @relation(fields: [parentId], references: [id])
-  bookings  Booking[]
-  payments  Payment[]
-  attendance Attendance[]
+  parent       Parent?      @relation(fields: [parentId], references: [id])
+  bookings     Booking[]
+  payments     Payment[]
+  attendance   Attendance[]
+  badges       Badge[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Badge {
+  id          Int      @id @default(autoincrement())
+  athleteId   Int
+  type        String   // streak, achievement, skill
+  name        String
+  description String?
+  icon        String?
+  awardedAt   DateTime @default(now())
+  athlete     Athlete  @relation(fields: [athleteId], references: [id])
+
+  @@index([athleteId])
 }
 
 model Coach {
